@@ -65,7 +65,7 @@ class AnimatedBottomNavBar extends StatelessWidget {
                   decoration: BoxDecoration(
                     // Subtle pill highlight for active tab
                     color: isSelected
-                        ? Colors.white.withOpacity(0.12)
+                        ? Colors.white
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(24),
                   ),
@@ -80,7 +80,7 @@ class AnimatedBottomNavBar extends StatelessWidget {
                           item.icon,
                           size: 24,
                           color: isSelected
-                              ? Colors.white
+                              ? Colors.black
                               : Colors.white.withOpacity(0.6),
                         ),
                       ),
@@ -93,7 +93,7 @@ class AnimatedBottomNavBar extends StatelessWidget {
                           fontWeight:
                               isSelected ? FontWeight.w600 : FontWeight.w400,
                           color: isSelected
-                              ? Colors.white
+                              ? Colors.black
                               : Colors.white.withOpacity(0.7),
                         ),
                         child: Text(

@@ -39,7 +39,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    Timer(const Duration(seconds: 2), _handleNavigation);
+    Timer(const Duration(seconds: 3), _handleNavigation);
   }
 
   void _handleNavigation() {

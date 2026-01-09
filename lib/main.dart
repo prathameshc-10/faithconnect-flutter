@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -12,8 +13,18 @@ import 'views/screens/splash_screen.dart';
 /// FaithConnect App
 /// Main entry point for the mobile application
 /// Uses Provider for state management
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: FirebaseOptions(
+      apiKey: "AIzaSyAY3P3-Zbrt4CtKz3r1IuN7Dky8vYIwHKM",
+      appId: "1:813260181154:android:cb43e6fa6561deba2d11fb",
+      messagingSenderId: "813260181154",
+      projectId: "faithconnect-9746b",
+      storageBucket: "faithconnect-9746b.firebasestorage.app",
+    ),
+  );
 
   // Set system UI overlay style for mobile-only layout
   SystemChrome.setSystemUIOverlayStyle(
