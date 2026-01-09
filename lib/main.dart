@@ -5,7 +5,9 @@ import 'providers/navigation_provider.dart';
 import 'providers/feed_provider.dart';
 import 'providers/leaders_provider.dart';
 import 'providers/messages_provider.dart';
-import 'views/widgets/main_navigation.dart';
+import 'providers/app_state_provider.dart';
+import 'providers/posts_provider.dart';
+import 'views/screens/splash_screen.dart';
 
 /// FaithConnect App
 /// Main entry point for the mobile application
@@ -43,6 +45,10 @@ class FaithConnectApp extends StatelessWidget {
       providers: [
         // Navigation state provider (bottom navigation bar)
         ChangeNotifierProvider(create: (_) => NavigationProvider()),
+        // Global app state provider (auth + role)
+        ChangeNotifierProvider(create: (_) => AppStateProvider()),
+        // Content/posts provider (shared between worshipers and leaders)
+        ChangeNotifierProvider(create: (_) => PostsProvider()),
         // Feed state provider (Explore/Following tabs)
         ChangeNotifierProvider(create: (_) => FeedProvider()),
         // Leaders state provider (My Leaders/Explore tabs)
@@ -76,8 +82,8 @@ class FaithConnectApp extends StatelessWidget {
             brightness: Brightness.light,
           ),
         ),
-        // Main entry point: HomeFeedScreen with bottom navigation
-        home: const MainNavigation(),
+        // Main entry point: Splash screen which routes into auth/role flows
+        home: const SplashScreen(),
       ),
     );
   }

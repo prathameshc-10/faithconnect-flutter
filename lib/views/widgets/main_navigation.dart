@@ -2,70 +2,57 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/navigation_provider.dart';
 import '../screens/home_feed_screen.dart';
-import '../screens/create_screen.dart';
+import '../screens/religious_leaders_screen.dart';
 import '../screens/reels_screen.dart';
 import '../screens/messages_screen.dart';
 import '../screens/notifications_screen.dart';
+import 'animated_bottom_nav_bar.dart';
 
 /// Main Navigation Widget
-/// Provides bottom navigation bar and manages screen switching
-/// Uses Provider for state management
+///
+/// - Provides a floating, animated bottom navigation bar.
+/// - Uses [NavigationProvider] for tab state.
+/// - Uses [UserRoleProvider] for role-based behavior on the 4th tab.
 class MainNavigation extends StatelessWidget {
   const MainNavigation({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Initialize screens (preserved in IndexedStack to maintain state)
-    final screens = const [
-      HomeFeedScreen(),
-      CreateScreen(),
-      ReelsScreen(),
-      MessagesScreen(),
-      NotificationsScreen(),
+    final navigationProvider = context.watch<NavigationProvider>();
+
+    // Worshiper navigation only (leaders use LeaderMainNavigation).
+    // Tabs: Home | Religious Leaders | Reels | Messages | Profile
+    final screens = <Widget>[
+      const HomeFeedScreen(),
+      const ReligiousLeadersScreen(),
+      const ReelsScreen(),
+      const MessagesScreen(),
+      const NotificationsScreen(), // Placeholder profile
     ];
 
-    return Consumer<NavigationProvider>(
-      builder: (context, navigationProvider, child) {
-        return Scaffold(
-          body: IndexedStack(
-            index: navigationProvider.currentIndex,
-            children: screens,
-          ),
-          bottomNavigationBar: BottomNavigationBar(
-            currentIndex: navigationProvider.currentIndex,
-            onTap: (index) => navigationProvider.setCurrentIndex(index),
-            type: BottomNavigationBarType.fixed,
-            selectedItemColor: Colors.black,
-            unselectedItemColor: Colors.grey,
-            backgroundColor: Colors.white,
-            elevation: 8,
-            selectedFontSize: 12,
-            unselectedFontSize: 12,
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.home),
-                label: 'Home',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.create),
-                label: 'Create',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.video_library),
-                label: 'Reels',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.chat_bubble_outline),
-                label: 'Messages',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.notifications_outlined),
-                label: 'Notifications',
-              ),
-            ],
-          ),
-        );
-      },
+    final int safeIndex =
+        navigationProvider.currentIndex.clamp(0, screens.length - 1);
+
+    final items = const [
+      BottomNavItemData(icon: Icons.home_outlined, label: 'Home'),
+      BottomNavItemData(icon: Icons.people_alt_outlined, label: 'Leaders'),
+      BottomNavItemData(icon: Icons.play_circle_outline, label: 'Reels'),
+      BottomNavItemData(icon: Icons.chat_bubble_outline, label: 'Messages'),
+      BottomNavItemData(icon: Icons.person_outline, label: 'Profile'),
+    ];
+
+    return Scaffold(
+      // Allow content (e.g., Reels) to extend behind the floating bottom bar
+      extendBody: true,
+      body: IndexedStack(
+        index: safeIndex,
+        children: screens,
+      ),
+      bottomNavigationBar: AnimatedBottomNavBar(
+        currentIndex: safeIndex,
+        onItemSelected: (index) => navigationProvider.setCurrentIndex(index),
+        items: items,
+      ),
     );
   }
 }

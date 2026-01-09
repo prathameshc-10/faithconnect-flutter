@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../models/mock_data.dart';
+import 'package:provider/provider.dart';
 import '../../models/post_model.dart';
+import '../../models/mock_data.dart';
+import '../../providers/posts_provider.dart';
 import '../widgets/comments_bottom_sheet.dart';
 
 /// Reels Screen
@@ -15,20 +17,6 @@ class ReelsScreen extends StatefulWidget {
 
 class _ReelsScreenState extends State<ReelsScreen> {
   final PageController _pageController = PageController();
-  late List<PostModel> _reels;
-
-  @override
-  void initState() {
-    super.initState();
-    // Get all video posts (reels)
-    final allPosts = MockData.getMockPosts();
-    _reels = allPosts.where((post) => post.videoUrl != null).toList();
-    
-    // If no reels, add a placeholder
-    if (_reels.isEmpty) {
-      _reels = [allPosts.first];
-    }
-  }
 
   @override
   void dispose() {
@@ -293,6 +281,15 @@ class _ReelsScreenState extends State<ReelsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final postsProvider = Provider.of<PostsProvider>(context);
+    List<PostModel> reels = postsProvider.reels;
+
+    // If no reels, fall back to a single placeholder using first mock post.
+    if (reels.isEmpty) {
+      final allPosts = MockData.getMockPosts();
+      reels = [allPosts.first];
+    }
+
     // Get bottom navigation bar height for proper spacing
     final bottomNavHeight = kBottomNavigationBarHeight;
     
@@ -304,9 +301,9 @@ class _ReelsScreenState extends State<ReelsScreen> {
         child: PageView.builder(
           controller: _pageController,
           scrollDirection: Axis.vertical,
-          itemCount: _reels.length,
+          itemCount: reels.length,
           itemBuilder: (context, index) {
-            return _buildReelItem(_reels[index], bottomNavHeight);
+            return _buildReelItem(reels[index], bottomNavHeight);
           },
         ),
       ),

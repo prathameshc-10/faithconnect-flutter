@@ -1,23 +1,26 @@
 import 'package:flutter/foundation.dart';
 
-/// Navigation Provider for managing bottom navigation bar state
-/// Uses Provider pattern for state management
+/// Navigation Provider for managing bottom navigation bar state.
+///
+/// Index mapping is interpreted by each navigation shell:
+/// - Worshiper main nav uses 5 tabs (0‑4)
+/// - Leader main nav uses 4 tabs  (0‑3)
 class NavigationProvider with ChangeNotifier {
   int _currentIndex = 0;
 
-  /// Current selected tab index
-  /// 0: Home, 1: Create, 2: Reels, 3: Messages, 4: Notifications
+  /// Current selected tab index.
   int get currentIndex => _currentIndex;
 
-  /// Update the current navigation index
+  /// Update the current navigation index.
   void setCurrentIndex(int index) {
-    if (_currentIndex != index && index >= 0 && index < 5) {
+    // Guard against negative indices; upper bound is enforced by each shell.
+    if (_currentIndex != index && index >= 0) {
       _currentIndex = index;
       notifyListeners();
     }
   }
 
-  /// Reset to home screen
+  /// Reset to home screen.
   void goToHome() {
     setCurrentIndex(0);
   }

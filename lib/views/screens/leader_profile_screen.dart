@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../models/user_model.dart';
 import '../../models/post_model.dart';
 import '../../models/mock_data.dart';
+import '../../providers/posts_provider.dart';
 import '../widgets/post_card.dart';
 import '../widgets/comments_bottom_sheet.dart';
 
@@ -38,20 +40,14 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
 
   /// Get posts for this leader (Posts tab)
   List<PostModel> _getLeaderPosts() {
-    final allPosts = MockData.getMockPosts();
-    // Filter posts by this leader, excluding video posts
-    return allPosts
-        .where((post) => post.author.id == widget.leader.id && post.videoUrl == null)
-        .toList();
+    final postsProvider = context.read<PostsProvider>();
+    return postsProvider.postsForLeader(widget.leader.id);
   }
 
   /// Get reels for this leader (Reels tab - video posts)
   List<PostModel> _getLeaderReels() {
-    final allPosts = MockData.getMockPosts();
-    // Filter posts by this leader, only video posts
-    return allPosts
-        .where((post) => post.author.id == widget.leader.id && post.videoUrl != null)
-        .toList();
+    final postsProvider = context.read<PostsProvider>();
+    return postsProvider.reelsForLeader(widget.leader.id);
   }
 
   /// Build profile header section

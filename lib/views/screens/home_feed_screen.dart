@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../models/mock_data.dart';
 import '../../providers/feed_provider.dart';
+import '../../providers/posts_provider.dart';
+import '../../models/mock_data.dart';
 import '../widgets/post_card.dart';
 import '../widgets/comments_bottom_sheet.dart';
 
@@ -70,7 +71,8 @@ class HomeFeedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final feedProvider = Provider.of<FeedProvider>(context);
-    final posts = MockData.getMockPosts();
+    final postsProvider = Provider.of<PostsProvider>(context);
+    final posts = postsProvider.posts;
 
     return Scaffold(
       backgroundColor: Colors.white,
