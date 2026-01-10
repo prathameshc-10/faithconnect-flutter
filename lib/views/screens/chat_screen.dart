@@ -26,11 +26,11 @@ class _ChatScreenState extends State<ChatScreen> {
   void _loadMockMessages() {
     final now = DateTime.now();
     _messages.addAll([
-      Message(id: 'm1', text: 'Hello! How are you?', timestamp: now.subtract(const Duration(minutes: 70)), isSent: false),
-      Message(id: 'm2', text: 'I am well, thank you. The sermon was uplifting.', timestamp: now.subtract(const Duration(minutes: 65)), isSent: true),
-      Message(id: 'm3', text: 'Praise God! 🙌', timestamp: now.subtract(const Duration(minutes: 12)), isSent: false),
-      Message(id: 'm4', text: 'Are you joining the prayer meeting tomorrow?', timestamp: now.subtract(const Duration(minutes: 9)), isSent: true),
-      Message(id: 'm5', text: 'Yes, I will be there.', timestamp: now.subtract(const Duration(minutes: 2)), isSent: false),
+      Message(id: 'm1', text: 'Hello! How are you?', timestamp: DateTime(now.year, now.month, now.day, 8, 20), isSent: false),
+      Message(id: 'm2', text: 'I am well, thank you. The sermon was uplifting.', timestamp: DateTime(now.year, now.month, now.day, 8, 25), isSent: true),
+      Message(id: 'm3', text: 'Praise God! 🙌', timestamp: DateTime(now.year, now.month, now.day, 9, 16), isSent: false),
+      Message(id: 'm4', text: 'Are you joining the prayer meeting tomorrow?', timestamp: DateTime(now.year, now.month, now.day, 9, 30), isSent: true),
+      Message(id: 'm5', text: 'Yes, I will be there.', timestamp: DateTime(now.year, now.month, now.day, 9, 34), isSent: false),
     ]);
   }
 
@@ -67,33 +67,62 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: Row(
           children: [
-            const CircleAvatar(radius: 18, backgroundColor: Colors.blueAccent, child: Icon(Icons.person, color: Colors.white, size: 18)),
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: Colors.grey[300],
+              child: const Icon(Icons.person, color: Colors.grey, size: 18),
+            ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: widget.isOnline ? Colors.green : Colors.grey,
-                        shape: BoxShape.circle,
-                      ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      color: Colors.black87,
                     ),
-                    const SizedBox(width: 6),
-                    Text(widget.isOnline ? 'Online' : 'Offline', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                  ],
-                ),
-              ],
-            )
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: widget.isOnline ? Colors.grey[700] : Colors.grey[400],
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        widget.isOnline ? 'Online now' : 'Offline',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.more_vert, color: Colors.black),
+            onPressed: () {},
+          ),
+        ],
       ),
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -102,14 +131,11 @@ class _ChatScreenState extends State<ChatScreen> {
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                 itemCount: _messages.length,
                 itemBuilder: (context, index) {
                   final m = _messages[index];
-                  return Align(
-                    alignment: m.isSent ? Alignment.centerRight : Alignment.centerLeft,
-                    child: ChatBubble(text: m.text, timestamp: m.timestamp, isSent: m.isSent),
-                  );
+                  return ChatBubble(text: m.text, timestamp: m.timestamp, isSent: m.isSent);
                 },
               ),
             ),
@@ -126,10 +152,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         controller: _controller,
                         textCapitalization: TextCapitalization.sentences,
                         decoration: InputDecoration(
-                          hintText: 'Message',
+                          hintText: 'Type message...',
+                          hintStyle: TextStyle(color: Colors.grey[500]),
                           filled: true,
-                          fillColor: Colors.grey.shade100,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          fillColor: Colors.grey[100],
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(24),
                             borderSide: BorderSide.none,
@@ -139,13 +166,14 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Material(
-                      shape: const CircleBorder(),
-                      color: Theme.of(context).colorScheme.primary,
-                      child: IconButton(
-                        onPressed: _sendMessage,
-                        icon: const Icon(Icons.send, color: Colors.white),
-                      ),
+                    IconButton(
+                      onPressed: () {},
+                      icon: const Icon(Icons.add, color: Colors.black),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      onPressed: _sendMessage,
+                      icon: const Icon(Icons.mic, color: Colors.black),
                     ),
                   ],
                 ),

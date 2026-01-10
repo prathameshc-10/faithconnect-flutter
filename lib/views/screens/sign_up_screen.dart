@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_state_provider.dart';
 import '../../providers/user_role_provider.dart';
+import '../../constants/communities.dart';
 import '../widgets/main_navigation.dart';
 import 'leader_profile_setup_screen.dart';
 
@@ -18,19 +19,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _passwordController = TextEditingController();
 
   String? _selectedCommunity;
-
-  final List<String> _communities = [
-    'Hindu',
-    'Christian',
-    'Sikh',
-    'Muslim',
-    'Buddhist',
-    'Jain',
-    'Other',
-  ];
-
   UserRole _selectedRole = UserRole.worshiper;
   bool _obscurePassword = true;
+  bool _isLoading = false;
+  String? _errorMessage;
+  final _formKey = GlobalKey<FormState>();
 
   @override
   void dispose() {
@@ -40,20 +33,49 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
-  void _onSignUp() {
-    final appState = context.read<AppStateProvider>();
-    appState.signUp(role: _selectedRole);
+  Future<void> _onSignUp() async {
+    if (!_formKey.currentState!.validate()) return;
 
-    if (_selectedRole == UserRole.worshiper) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const MainNavigation()),
-        (_) => false,
+    if (_selectedCommunity == null || _selectedCommunity!.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please select your community';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final appState = context.read<AppStateProvider>();
+      await appState.signUp(
+        email: _emailController.text,
+        password: _passwordController.text,
+        name: _nameController.text,
+        role: _selectedRole,
+        community: _selectedCommunity!,
       );
-    } else {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LeaderProfileSetupScreen()),
-        (_) => false,
-      );
+
+      if (!mounted) return;
+
+      if (_selectedRole == UserRole.worshiper) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const MainNavigation()),
+          (_) => false,
+        );
+      } else {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LeaderProfileSetupScreen()),
+          (_) => false,
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _isLoading = false;
+      });
     }
   }
 
@@ -130,77 +152,139 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
               const SizedBox(height: 28),
 
-              /// Full name
-              _InputLabel('FULL NAME'),
-              _InputField(
-                controller: _nameController,
-                hint: 'John Doe',
-                icon: Icons.person_outline,
+              Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    /// Full name
+                    _InputLabel('FULL NAME'),
+                    _InputField(
+                      controller: _nameController,
+                      hint: 'John Doe',
+                      icon: Icons.person_outline,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your name';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    /// Email
+                    _InputLabel('EMAIL ADDRESS'),
+                    _InputField(
+                      controller: _emailController,
+                      hint: 'name@example.com',
+                      icon: Icons.mail_outline,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your email';
+                        }
+                        if (!value.contains('@')) {
+                          return 'Please enter a valid email';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    /// Community
+                    _InputLabel('COMMUNITY'),
+                    DropdownButtonFormField<String>(
+                      value: _selectedCommunity,
+                      items: Communities.all
+                          .map(
+                            (community) => DropdownMenuItem(
+                              value: community,
+                              child: Text(community),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedCommunity = value;
+                          _errorMessage = null;
+                        });
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please select your community';
+                        }
+                        return null;
+                      },
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.groups_outlined),
+                        hintText: 'Select your community',
+                        filled: true,
+                        fillColor:
+                            isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      dropdownColor: isDark ? Colors.grey.shade900 : Colors.white,
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    /// Password
+                    _InputLabel('PASSWORD'),
+                    _InputField(
+                      controller: _passwordController,
+                      hint: '••••••••',
+                      icon: Icons.lock_outline,
+                      obscureText: _obscurePassword,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter a password';
+                        }
+                        if (value.length < 6) {
+                          return 'Password must be at least 6 characters';
+                        }
+                        return null;
+                      },
+                      suffix: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        ),
+                        onPressed:
+                            () =>
+                                setState(() => _obscurePassword = !_obscurePassword),
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
-              const SizedBox(height: 20),
-
-              /// Email
-              _InputLabel('EMAIL ADDRESS'),
-              _InputField(
-                controller: _emailController,
-                hint: 'name@example.com',
-                icon: Icons.mail_outline,
-                keyboardType: TextInputType.emailAddress,
-              ),
-
-              const SizedBox(height: 20),
-
-              /// Community
-              _InputLabel('COMMUNITY'),
-              DropdownButtonFormField<String>(
-                value: _selectedCommunity,
-                items:
-                    _communities
-                        .map(
-                          (community) => DropdownMenuItem(
-                            value: community,
-                            child: Text(community),
-                          ),
-                        )
-                        .toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCommunity = value;
-                  });
-                },
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.groups_outlined),
-                  hintText: 'Select your community',
-                  filled: true,
-                  fillColor:
-                      isDark ? Colors.grey.shade900 : Colors.grey.shade100,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: TextStyle(color: Colors.red[700], fontSize: 14),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                dropdownColor: isDark ? Colors.grey.shade900 : Colors.white,
-              ),
-
-              const SizedBox(height: 20),
-
-              /// Password
-              _InputLabel('PASSWORD'),
-              _InputField(
-                controller: _passwordController,
-                hint: '••••••••',
-                icon: Icons.lock_outline,
-                obscureText: _obscurePassword,
-                suffix: IconButton(
-                  icon: Icon(
-                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                  ),
-                  onPressed:
-                      () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
-                ),
-              ),
+              ],
 
               const SizedBox(height: 20),
 
@@ -220,7 +304,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _onSignUp,
+                  onPressed: _isLoading ? null : _onSignUp,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
                     foregroundColor: Colors.white,
@@ -229,10 +313,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: const Text(
-                    'Create Account',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text(
+                          'Create Account',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
                 ),
               ),
 
@@ -335,6 +428,7 @@ class _InputField extends StatelessWidget {
   final bool obscureText;
   final Widget? suffix;
   final TextInputType? keyboardType;
+  final String? Function(String?)? validator;
 
   const _InputField({
     required this.controller,
@@ -343,16 +437,18 @@ class _InputField extends StatelessWidget {
     this.obscureText = false,
     this.suffix,
     this.keyboardType,
+    this.validator,
   });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return TextField(
+    return TextFormField(
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
+      validator: validator,
       decoration: InputDecoration(
         prefixIcon: Icon(icon),
         suffixIcon: suffix,

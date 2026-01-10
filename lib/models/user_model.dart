@@ -6,6 +6,8 @@ class UserModel {
   final String profileImageUrl;
   final bool isVerified;
   final String? description; // Optional description/bio
+  final String? community; // Community (Hindu / Christian / Sikh etc.)
+  final String? role; // Short description or role (e.g., "Temple Priest", "Pastor")
 
   UserModel({
     required this.id,
@@ -14,5 +16,7 @@ class UserModel {
     required this.profileImageUrl,
     this.isVerified = false,
     this.description,
+    this.community,
+    this.role,
   });
 }

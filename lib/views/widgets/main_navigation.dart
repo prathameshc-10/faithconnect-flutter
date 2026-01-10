@@ -5,7 +5,7 @@ import '../screens/home_feed_screen.dart';
 import '../screens/religious_leaders_screen.dart';
 import '../screens/reels_screen.dart';
 import '../screens/messages_screen.dart';
-import '../screens/notifications_screen.dart';
+import '../screens/worshiper_profile_screen.dart';
 import 'animated_bottom_nav_bar.dart';
 
 /// Main Navigation Widget
@@ -27,7 +27,7 @@ class MainNavigation extends StatelessWidget {
       const ReligiousLeadersScreen(),
       const ReelsScreen(),
       const MessagesScreen(),
-      const NotificationsScreen(), // Placeholder profile
+      const WorshiperProfileScreen(),
     ];
 
     final int safeIndex =

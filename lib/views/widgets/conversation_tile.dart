@@ -10,10 +10,21 @@ class ConversationTile extends StatelessWidget {
   String _formatTime(DateTime ts) {
     final now = DateTime.now();
     final diff = now.difference(ts);
-    if (diff.inDays >= 1) return '${diff.inDays}d';
-    if (diff.inHours >= 1) return '${diff.inHours}h';
-    if (diff.inMinutes >= 1) return '${diff.inMinutes}m';
-    return 'now';
+    
+    if (diff.inDays >= 365) {
+      return '${ts.year}/${ts.month}/${ts.day}';
+    } else if (diff.inDays >= 7) {
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${months[ts.month - 1]} ${ts.day}, ${ts.year}';
+    } else if (diff.inDays >= 1) {
+      if (diff.inDays == 1) return 'Yesterday';
+      return '${diff.inDays} days ago';
+    } else if (diff.inHours >= 1) {
+      return '${diff.inHours} ${diff.inHours == 1 ? 'hour' : 'hours'} ago';
+    } else if (diff.inMinutes >= 1) {
+      return '${diff.inMinutes} ${diff.inMinutes == 1 ? 'min' : 'mins'} ago';
+    }
+    return '1 min ago';
   }
 
   @override
@@ -28,10 +39,13 @@ class ConversationTile extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 26,
-              backgroundColor: Colors.blue.shade100,
+              backgroundColor: Colors.grey[300],
               child: Text(
                 initials,
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[700],
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -44,40 +58,44 @@ class ConversationTile extends StatelessWidget {
                       Expanded(
                         child: Text(
                           conversation.name,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            color: Colors.black87,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         _formatTime(conversation.timestamp),
-                        style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                        ),
                       ),
+                      if (conversation.isUnread) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          conversation.lastMessage,
-                          style: TextStyle(color: Colors.grey.shade700),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (conversation.isUnread)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 8.0),
-                          child: Container(
-                            width: 10,
-                            height: 10,
-                            decoration: const BoxDecoration(
-                              color: Colors.blue,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                    ],
+                  Text(
+                    conversation.lastMessage,
+                    style: TextStyle(
+                      color: Colors.grey.shade700,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ],
               ),

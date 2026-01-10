@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../models/mock_data.dart';
 import '../../models/user_model.dart';
 import '../../providers/leaders_provider.dart';
+import '../../providers/app_state_provider.dart';
 import '../widgets/leader_card.dart';
 import 'leader_profile_screen.dart';
 
@@ -111,7 +111,7 @@ class ReligiousLeadersScreen extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.blue),
+            borderSide: const BorderSide(color: Colors.black),
           ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           filled: true,
@@ -145,12 +145,17 @@ class ReligiousLeadersScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<LeadersProvider>(
-      builder: (context, provider, child) {
-        // Get appropriate list based on selected tab
-        final allLeaders = provider.isMyLeadersSelected
-            ? MockData.getMockMyLeaders()
-            : MockData.getMockExploreLeaders();
+    return Consumer2<LeadersProvider, AppStateProvider>(
+      builder: (context, provider, appState, child) {
+        // Load leaders when screen is built and community is available
+        if (appState.community != null && provider.allLeaders.isEmpty && !provider.isLoading) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            provider.loadLeaders(appState.community!);
+          });
+        }
+
+        // Get leaders from provider (filtered by community from Firestore)
+        final allLeaders = provider.allLeaders;
         
         // Filter based on search query
         final filteredLeaders = _filterLeaders(allLeaders, provider.searchQuery);
@@ -160,7 +165,6 @@ class ReligiousLeadersScreen extends StatelessWidget {
           appBar: AppBar(
             elevation: 0,
             backgroundColor: Colors.white,
-            automaticallyImplyLeading: false,
             title: const Text(
               'Religious Leaders',
               style: TextStyle(
@@ -197,17 +201,23 @@ class ReligiousLeadersScreen extends StatelessWidget {
               _buildSortByDropdown(context, provider),
               // Leaders list
               Expanded(
-                child: filteredLeaders.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No leaders found',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 14,
-                          ),
-                        ),
+                child: provider.isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(),
                       )
-                    : ListView.builder(
+                    : filteredLeaders.isEmpty
+                        ? Center(
+                            child: Text(
+                              appState.community == null
+                                  ? 'Please select a community'
+                                  : 'No leaders found in your community',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         itemCount: filteredLeaders.length,
                         itemBuilder: (context, index) {

@@ -14,6 +14,8 @@ class MockData {
         profileImageUrl: '',
         isVerified: true,
         description: 'Curabitur interdum, justo at dignissim dignissim, nisi nisl tincidunt nulla, vitae efficitur lorem ipsum dolor sit amet.',
+        community: 'Jewish',
+        role: 'Temple Priest',
       ),
       UserModel(
         id: '2',
@@ -22,6 +24,8 @@ class MockData {
         profileImageUrl: '',
         isVerified: true,
         description: 'Consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+        community: 'Jewish',
+        role: 'Rabbi',
       ),
       UserModel(
         id: '3',
@@ -30,6 +34,8 @@ class MockData {
         profileImageUrl: '',
         isVerified: true,
         description: 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
+        community: 'Jewish',
+        role: 'Pastor',
       ),
       UserModel(
         id: '4',
@@ -38,6 +44,8 @@ class MockData {
         profileImageUrl: '',
         isVerified: true,
         description: 'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.',
+        community: 'Jewish',
+        role: 'Temple Priest',
       ),
       UserModel(
         id: '5',
@@ -46,6 +54,8 @@ class MockData {
         profileImageUrl: '',
         isVerified: true,
         description: 'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
+        community: 'Jewish',
+        role: 'Rabbi',
       ),
       UserModel(
         id: '6',
@@ -54,6 +64,8 @@ class MockData {
         profileImageUrl: '',
         isVerified: true,
         description: 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium.',
+        community: 'Jewish',
+        role: 'Pastor',
       ),
     ];
   }

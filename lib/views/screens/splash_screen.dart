@@ -39,7 +39,20 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    Timer(const Duration(seconds: 3), _handleNavigation);
+    _initializeAndNavigate();
+  }
+
+  Future<void> _initializeAndNavigate() async {
+    // Initialize app state (check if user is already signed in)
+    final appState = context.read<AppStateProvider>();
+    await appState.initialize();
+
+    // Wait for splash animation
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (!mounted) return;
+
+    _handleNavigation();
   }
 
   void _handleNavigation() {
@@ -54,7 +67,8 @@ class _SplashScreenState extends State<SplashScreen>
       return;
     }
 
-    if (appState.userRole == UserRole.worshiper) {
+    final userRole = appState.userRole;
+    if (userRole == UserRole.worshiper) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const MainNavigation()),

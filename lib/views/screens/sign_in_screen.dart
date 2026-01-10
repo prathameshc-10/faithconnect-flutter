@@ -16,7 +16,9 @@ class SignInScreen extends StatefulWidget {
 class _SignInScreenState extends State<SignInScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  UserRole _selectedRole = UserRole.worshiper;
+  final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -25,20 +27,48 @@ class _SignInScreenState extends State<SignInScreen> {
     super.dispose();
   }
 
-  void _onSignIn() {
-    final appState = context.read<AppStateProvider>();
-    appState.signIn(role: _selectedRole);
+  Future<void> _onSignIn() async {
+    if (!_formKey.currentState!.validate()) return;
 
-    if (_selectedRole == UserRole.worshiper) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainNavigation()),
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final appState = context.read<AppStateProvider>();
+      await appState.signIn(
+        email: _emailController.text,
+        password: _passwordController.text,
       );
-    } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const LeaderProfileSetupScreen()),
-      );
+
+      if (!mounted) return;
+
+      final userRole = appState.userRole;
+      if (userRole == UserRole.worshiper) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MainNavigation()),
+        );
+      } else {
+        if (appState.isLeaderProfileComplete) {
+          // Navigate to leader dashboard if profile is complete
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MainNavigation()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const LeaderProfileSetupScreen()),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _isLoading = false;
+      });
     }
   }
 
@@ -77,60 +107,85 @@ class _SignInScreenState extends State<SignInScreen> {
 
               const SizedBox(height: 32),
 
-              /// Email
-              _InputLabel('Email Address'),
-              _InputField(
-                controller: _emailController,
-                hint: 'name@example.com',
-                keyboardType: TextInputType.emailAddress,
-              ),
-
-              const SizedBox(height: 20),
-
-              /// Password
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _InputLabel('Password'),
-                  TextButton(
-                    onPressed: () {},
-                    child: const Text(
-                      'Forgot?',
-                      style: TextStyle(fontSize: 12),
+              Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    /// Email
+                    _InputLabel('Email Address'),
+                    _InputField(
+                      controller: _emailController,
+                      hint: 'name@example.com',
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your email';
+                        }
+                        if (!value.contains('@')) {
+                          return 'Please enter a valid email';
+                        }
+                        return null;
+                      },
                     ),
-                  ),
-                ],
-              ),
-              _InputField(
-                controller: _passwordController,
-                hint: '••••••••',
-                obscureText: true,
+
+                    const SizedBox(height: 20),
+
+                    /// Password
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _InputLabel('Password'),
+                        TextButton(
+                          onPressed: () {},
+                          child: const Text(
+                            'Forgot?',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                    _InputField(
+                      controller: _passwordController,
+                      hint: '••••••••',
+                      obscureText: true,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your password';
+                        }
+                        if (value.length < 6) {
+                          return 'Password must be at least 6 characters';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
               ),
 
-              const SizedBox(height: 28),
-
-              /// Role selector
-              _InputLabel('I am a...'),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _RoleCard(
-                    label: 'Worshiper',
-                    icon: Icons.person_outline,
-                    selected: _selectedRole == UserRole.worshiper,
-                    onTap: () =>
-                        setState(() => _selectedRole = UserRole.worshiper),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red[200]!),
                   ),
-                  const SizedBox(width: 16),
-                  _RoleCard(
-                    label: 'Religious Leader',
-                    icon: Icons.auto_awesome_outlined,
-                    selected: _selectedRole == UserRole.leader,
-                    onTap: () =>
-                        setState(() => _selectedRole = UserRole.leader),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: TextStyle(color: Colors.red[700], fontSize: 14),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
 
               const SizedBox(height: 32),
 
@@ -138,7 +193,7 @@ class _SignInScreenState extends State<SignInScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _onSignIn,
+                  onPressed: _isLoading ? null : _onSignIn,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
                     foregroundColor: Colors.white,
@@ -148,13 +203,22 @@ class _SignInScreenState extends State<SignInScreen> {
                     ),
                     elevation: 4,
                   ),
-                  child: const Text(
-                    'Sign In',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text(
+                          'Sign In',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
 
@@ -239,22 +303,25 @@ class _InputField extends StatelessWidget {
   final String hint;
   final bool obscureText;
   final TextInputType? keyboardType;
+  final String? Function(String?)? validator;
 
   const _InputField({
     required this.controller,
     required this.hint,
     this.obscureText = false,
     this.keyboardType,
+    this.validator,
   });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return TextField(
+    return TextFormField(
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
+      validator: validator,
       decoration: InputDecoration(
         hintText: hint,
         filled: true,

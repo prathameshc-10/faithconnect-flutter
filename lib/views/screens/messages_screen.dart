@@ -15,10 +15,30 @@ class MessagesScreen extends StatelessWidget {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
+        automaticallyImplyLeading: false,
         title: const Text(
           'Messages',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
         ),
+        actions: [
+          // Profile avatar on the right
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: CircleAvatar(
+              radius: 18,
+              backgroundColor: Colors.grey[300],
+              child: const Icon(
+                Icons.person,
+                color: Colors.grey,
+                size: 20,
+              ),
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -28,7 +48,6 @@ class MessagesScreen extends StatelessWidget {
               onChanged: provider.setQuery,
             );
           }),
-          const Divider(height: 1),
           Expanded(
             child: Consumer<MessagesProvider>(
               builder: (context, provider, _) {
@@ -48,6 +67,7 @@ class MessagesScreen extends StatelessWidget {
 
                 return ListView.separated(
                   physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
                   itemCount: convos.length,
                   separatorBuilder: (_, __) => const Divider(height: 1, indent: 16, endIndent: 16),
                   itemBuilder: (context, i) {

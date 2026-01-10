@@ -1,22 +1,24 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+
 import '../../models/user_model.dart';
 import '../../models/post_model.dart';
-import '../../models/mock_data.dart';
 import '../../providers/posts_provider.dart';
+import '../../providers/app_state_provider.dart';
+import '../../services/firestore_service.dart';
 import '../widgets/post_card.dart';
 import '../widgets/comments_bottom_sheet.dart';
 
 /// Leader Profile Screen
-/// Displays a leader's profile with Posts and Reels tabs
-/// Uses Navigator.push for navigation
+/// Displays leader profile with Posts & Reels tabs
+/// Supports profile image picking + logout
 class LeaderProfileScreen extends StatefulWidget {
   final UserModel leader;
 
-  const LeaderProfileScreen({
-    super.key,
-    required this.leader,
-  });
+  const LeaderProfileScreen({super.key, required this.leader});
 
   @override
   State<LeaderProfileScreen> createState() => _LeaderProfileScreenState();
@@ -25,11 +27,21 @@ class LeaderProfileScreen extends StatefulWidget {
 class _LeaderProfileScreenState extends State<LeaderProfileScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final FirestoreService _firestoreService = FirestoreService();
+
+  /// IMAGE PICKER
+  final ImagePicker _imagePicker = ImagePicker();
+  File? _localProfileImage;
+
+  UserModel? _loadedLeader;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadLeaderData();
+    _loadPostsAndReels();
   }
 
   @override
@@ -38,128 +50,207 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
     super.dispose();
   }
 
-  /// Get posts for this leader (Posts tab)
+  /// Load posts & reels
+  void _loadPostsAndReels() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final appState = context.read<AppStateProvider>();
+      if (appState.community != null) {
+        final postsProvider = context.read<PostsProvider>();
+        postsProvider.loadPosts(appState.community!);
+        postsProvider.loadReels(appState.community!);
+      }
+    });
+  }
+
+  /// Load leader data from Firestore
+  Future<void> _loadLeaderData() async {
+    try {
+      final leaderData =
+          await _firestoreService.getLeaderData(widget.leader.id);
+
+      if (!mounted) return;
+
+      if (leaderData != null) {
+        setState(() {
+          _loadedLeader = UserModel(
+            id: widget.leader.id,
+            name: leaderData['name'] ?? widget.leader.name,
+            username:
+                '@${(leaderData['name'] ?? widget.leader.name).toLowerCase().replaceAll(' ', '_')}',
+            profileImageUrl: leaderData['profileImageUrl'] ?? '',
+            isVerified: false,
+            description: leaderData['bio'],
+            community: leaderData['community'],
+            role: leaderData['role'],
+          );
+          _isLoading = false;
+        });
+      } else {
+        _loadedLeader = widget.leader;
+        _isLoading = false;
+      }
+    } catch (_) {
+      _loadedLeader = widget.leader;
+      _isLoading = false;
+    }
+  }
+
+  UserModel get _currentLeader => _loadedLeader ?? widget.leader;
+
+  /// IMAGE PICK
+  Future<void> _pickProfileImage() async {
+    final XFile? image = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+
+    if (image == null) return;
+
+    setState(() {
+      _localProfileImage = File(image.path);
+    });
+
+    // 🔥 NEXT STEP (optional)
+    // Upload to Firebase Storage
+    // Save download URL to Firestore
+  }
+
+  /// POSTS
   List<PostModel> _getLeaderPosts() {
-    final postsProvider = context.read<PostsProvider>();
-    return postsProvider.postsForLeader(widget.leader.id);
+    return context.read<PostsProvider>().postsForLeader(_currentLeader.id);
   }
 
-  /// Get reels for this leader (Reels tab - video posts)
+  /// REELS
   List<PostModel> _getLeaderReels() {
-    final postsProvider = context.read<PostsProvider>();
-    return postsProvider.reelsForLeader(widget.leader.id);
+    return context.read<PostsProvider>().reelsForLeader(_currentLeader.id);
   }
 
-  /// Build profile header section
+  /// PROFILE HEADER
   Widget _buildProfileHeader() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(
-          bottom: BorderSide(color: Colors.grey[200]!, width: 1),
-        ),
+        border: Border(bottom: BorderSide(color: Colors.black12)),
       ),
       child: Column(
         children: [
-          // Profile image
-          CircleAvatar(
-            radius: 50,
-            backgroundColor: Colors.grey[200],
-            backgroundImage: widget.leader.profileImageUrl.isNotEmpty
-                ? NetworkImage(widget.leader.profileImageUrl)
-                : null,
-            child: widget.leader.profileImageUrl.isEmpty
-                ? Icon(
-                    Icons.person,
-                    color: Colors.grey[400],
-                    size: 50,
-                  )
-                : null,
-          ),
-          const SizedBox(height: 16),
-          
-          // Name with verification badge
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                widget.leader.name,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+          /// PROFILE IMAGE
+          GestureDetector(
+            onTap: _pickProfileImage,
+            child: Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                CircleAvatar(
+                  radius: 56,
+                  backgroundColor: Colors.grey.shade200,
+                  backgroundImage: _localProfileImage != null
+                      ? FileImage(_localProfileImage!)
+                      : (_currentLeader.profileImageUrl.isNotEmpty
+                          ? NetworkImage(_currentLeader.profileImageUrl)
+                          : null) as ImageProvider?,
+                  child: (_localProfileImage == null &&
+                          _currentLeader.profileImageUrl.isEmpty)
+                      ? Icon(Icons.person,
+                          size: 56, color: Colors.grey.shade500)
+                      : null,
                 ),
-              ),
-              if (widget.leader.isVerified) ...[
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.verified,
-                  color: Colors.blue[600],
-                  size: 24,
+
+                /// VERIFIED BADGE
+                if (_currentLeader.isVerified)
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: const Icon(Icons.verified,
+                        size: 18, color: Colors.white),
+                  ),
+
+                /// CAMERA ICON
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: const Icon(Icons.camera_alt,
+                        size: 16, color: Colors.white),
+                  ),
                 ),
               ],
-            ],
-          ),
-          const SizedBox(height: 8),
-          
-          // Username
-          Text(
-            widget.leader.username,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
             ),
           ),
+
           const SizedBox(height: 16),
-          
-          // Bio/Description
-          if (widget.leader.description != null) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+
+          /// NAME
+          Text(
+            _currentLeader.name,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          /// USERNAME
+          Text(
+            _currentLeader.username,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.black54,
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          /// BIO
+          if (_currentLeader.description != null &&
+              _currentLeader.description!.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.black12),
+              ),
               child: Text(
-                widget.leader.description!,
+                _currentLeader.description!,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
+                style: const TextStyle(
+                  fontStyle: FontStyle.italic,
                   height: 1.5,
-                  color: Colors.grey[700],
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-          ] else
-            const SizedBox(height: 16),
-          
-          // Message button
+
+          const SizedBox(height: 20),
+
+          /// LOGOUT
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                // Handle message action (no logic required)
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Message ${widget.leader.name}'),
-                    duration: const Duration(seconds: 1),
-                  ),
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.logout),
+              label: const Text('Logout'),
+              onPressed: () async {
+                final appState = context.read<AppStateProvider>();
+                await appState.signOut();
+                if (!mounted) return;
+
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  '/login',
+                  (_) => false,
                 );
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-              child: const Text(
-                'Message',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
             ),
           ),
         ],
@@ -167,146 +258,64 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
     );
   }
 
-  /// Build posts tab content
+  /// POSTS TAB
   Widget _buildPostsTab() {
     final posts = _getLeaderPosts();
-
     if (posts.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.article_outlined,
-                size: 64,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No posts yet',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+      return const Center(child: Text('No posts yet'));
     }
 
     return ListView.builder(
-      padding: EdgeInsets.zero,
       itemCount: posts.length,
-      itemBuilder: (context, index) {
-        return PostCard(
-          post: posts[index],
-          onComment: () {
-            showCommentsBottomSheet(
-              context,
-              comments: MockData.getMockComments(),
-              postTitle: '${widget.leader.name}\'s Post',
-            );
-          },
-        );
-      },
+      itemBuilder: (_, i) => PostCard(
+        post: posts[i],
+        onComment: () {
+          showCommentsBottomSheet(
+            context,
+            comments: [],
+            postTitle: '${_currentLeader.name}\'s Post',
+          );
+        },
+      ),
     );
   }
 
-  /// Build reels tab content
+  /// REELS TAB
   Widget _buildReelsTab() {
     final reels = _getLeaderReels();
-
     if (reels.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.video_library_outlined,
-                size: 64,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No reels yet',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+      return const Center(child: Text('No reels yet'));
     }
 
     return ListView.builder(
-      padding: EdgeInsets.zero,
       itemCount: reels.length,
-      itemBuilder: (context, index) {
-        return PostCard(
-          post: reels[index],
-          onComment: () {
-            showCommentsBottomSheet(
-              context,
-              comments: MockData.getMockComments(),
-              postTitle: '${widget.leader.name}\'s Reel',
-            );
-          },
-        );
-      },
+      itemBuilder: (_, i) => PostCard(
+        post: reels[i],
+        onComment: () {
+          showCommentsBottomSheet(
+            context,
+            comments: [],
+            postTitle: '${_currentLeader.name}\'s Reel',
+          );
+        },
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          widget.leader.name,
-          style: const TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.black,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: Colors.black,
-          indicatorWeight: 2,
-          tabs: const [
-            Tab(
-              text: 'Posts',
-              icon: Icon(Icons.article_outlined),
-            ),
-            Tab(
-              text: 'Reels',
-              icon: Icon(Icons.video_library),
-            ),
-          ],
-        ),
-      ),
       body: Column(
         children: [
-          // Profile header
+          const SizedBox(height: 50),
           _buildProfileHeader(),
-          // Tab content
           Expanded(
             child: TabBarView(
               controller: _tabController,

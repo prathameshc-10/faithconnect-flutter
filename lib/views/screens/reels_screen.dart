@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/post_model.dart';
-import '../../models/mock_data.dart';
 import '../../providers/posts_provider.dart';
+import '../../providers/app_state_provider.dart';
 import '../widgets/comments_bottom_sheet.dart';
 
 /// Reels Screen
@@ -203,7 +203,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
                 icon: Icons.favorite,
                 count: _formatNumber(reel.likes),
                 onTap: () {
-                  // Handle like action (no logic required)
+                      // Handle like action (no logic required)
                 },
               ),
               const SizedBox(height: 24),
@@ -213,7 +213,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
                 onTap: () {
                   showCommentsBottomSheet(
                     context,
-                    comments: MockData.getMockComments(),
+                    comments: [], // TODO: Load comments from Firestore
                     postTitle: 'Reel Comments',
                   );
                 },
@@ -281,32 +281,96 @@ class _ReelsScreenState extends State<ReelsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final postsProvider = Provider.of<PostsProvider>(context);
-    List<PostModel> reels = postsProvider.reels;
+    return Consumer2<PostsProvider, AppStateProvider>(
+      builder: (context, postsProvider, appState, child) {
+        // Load reels when community is available
+        if (appState.community != null && appState.community!.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            postsProvider.loadReels(appState.community!);
+          });
+        }
 
-    // If no reels, fall back to a single placeholder using first mock post.
-    if (reels.isEmpty) {
-      final allPosts = MockData.getMockPosts();
-      reels = [allPosts.first];
-    }
+        final reels = postsProvider.reels;
+        final isLoading = postsProvider.isLoading;
 
-    // Get bottom navigation bar height for proper spacing
-    final bottomNavHeight = kBottomNavigationBarHeight;
-    
-    return Scaffold(
-      backgroundColor: Colors.black,
-      extendBody: true, // Extend body behind bottom navigation
-      body: SafeArea(
-        bottom: false, // Allow content to extend to bottom navigation area
-        child: PageView.builder(
-          controller: _pageController,
-          scrollDirection: Axis.vertical,
-          itemCount: reels.length,
-          itemBuilder: (context, index) {
-            return _buildReelItem(reels[index], bottomNavHeight);
-          },
-        ),
-      ),
+        // Get bottom navigation bar height for proper spacing
+        final bottomNavHeight = kBottomNavigationBarHeight;
+
+        if (isLoading) {
+          return Scaffold(
+            backgroundColor: Colors.black,
+            body: const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+          );
+        }
+
+        if (reels.isEmpty) {
+          return Scaffold(
+            backgroundColor: Colors.black,
+            extendBody: true,
+            body: SafeArea(
+              bottom: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.play_circle_outline,
+                        size: 64,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No reels yet',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[300],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Reels from leaders in your community will appear here',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+        
+        return Scaffold(
+          backgroundColor: Colors.black,
+          extendBody: true, // Extend body behind bottom navigation
+          body: SafeArea(
+            bottom: false, // Allow content to extend to bottom navigation area
+            child: RefreshIndicator(
+              onRefresh: () async {
+                if (appState.community != null) {
+                  await postsProvider.refresh(appState.community!);
+                }
+              },
+              child: PageView.builder(
+                controller: _pageController,
+                scrollDirection: Axis.vertical,
+                itemCount: reels.length,
+                itemBuilder: (context, index) {
+                  return _buildReelItem(reels[index], bottomNavHeight);
+                },
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

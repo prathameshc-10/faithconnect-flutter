@@ -57,7 +57,7 @@ class LeaderCard extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             
-            // Leader info: Name and Bio
+            // Leader info: Name, Community, Role, and Bio
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,15 +81,30 @@ class LeaderCard extends StatelessWidget {
                         const SizedBox(width: 6),
                         Icon(
                           Icons.verified,
-                          color: Colors.blue[600],
+                          color: Colors.grey[700],
                           size: 18,
                         ),
                       ],
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   
-                  // Short bio
+                  // Community and Role
+                  if (leader.community != null || leader.role != null) ...[
+                    Text(
+                      [
+                        leader.community,
+                        leader.role,
+                      ].where((s) => s != null && s.isNotEmpty).join(' • '),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                  
+                  // Short bio/description
                   if (leader.description != null) ...[
                     Text(
                       leader.description!,
@@ -118,15 +133,14 @@ class LeaderCard extends StatelessWidget {
   /// Build action button (Follow or Message)
   Widget _buildActionButton(BuildContext context) {
     final buttonText = showMessageButton ? 'Message' : 'Follow';
-    final buttonColor = showMessageButton ? Colors.blue : Colors.blue;
 
     return SizedBox(
       height: 36,
       child: OutlinedButton(
         onPressed: onAction,
         style: OutlinedButton.styleFrom(
-          foregroundColor: buttonColor,
-          side: BorderSide(color: buttonColor, width: 1.5),
+          foregroundColor: Colors.black,
+          side: const BorderSide(color: Colors.black, width: 1.5),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),

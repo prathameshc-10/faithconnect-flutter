@@ -1,12 +1,15 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/navigation_provider.dart';
+import '../../providers/app_state_provider.dart';
+import '../../services/firestore_service.dart';
+import '../../models/user_model.dart';
 import '../screens/leader_dashboard_screen.dart';
 import '../screens/create_content_screen.dart';
 import '../screens/messages_screen.dart';
 import '../screens/leader_profile_screen.dart';
 import 'animated_bottom_nav_bar.dart';
-import '../../models/mock_data.dart';
 
 /// Bottom navigation for religious leaders.
 ///
@@ -15,21 +18,67 @@ import '../../models/mock_data.dart';
 /// 1: Create
 /// 2: Messages
 /// 3: Profile
-class LeaderMainNavigation extends StatelessWidget {
+class LeaderMainNavigation extends StatefulWidget {
   const LeaderMainNavigation({super.key});
+
+  @override
+  State<LeaderMainNavigation> createState() => _LeaderMainNavigationState();
+}
+
+class _LeaderMainNavigationState extends State<LeaderMainNavigation> {
+  final FirestoreService _firestoreService = FirestoreService();
+  UserModel? _currentLeader;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLeaderData();
+  }
+
+  Future<void> _loadLeaderData() async {
+    final appState = context.read<AppStateProvider>();
+    if (appState.userId == null) return;
+
+    try {
+      final leaderData = await _firestoreService.getLeaderData(appState.userId!);
+      if (leaderData != null && mounted) {
+        setState(() {
+          _currentLeader = UserModel(
+            id: appState.userId!,
+            name: leaderData['name'] as String? ?? 'Leader',
+            username: '@${(leaderData['name'] as String? ?? 'leader').toLowerCase().replaceAll(' ', '_')}',
+            profileImageUrl: leaderData['profileImageUrl'] as String? ?? '',
+            isVerified: false,
+            description: leaderData['bio'] as String?,
+            community: leaderData['community'] as String?,
+            role: leaderData['role'] as String?,
+          );
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading leader data: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final navigationProvider = context.watch<NavigationProvider>();
+    final appState = context.watch<AppStateProvider>();
 
-    // For the profile tab we use the first mock leader as the "current" leader.
-    final mockLeader = MockData.getMockMyLeaders().first;
+    // Create a placeholder leader model from current user data
+    final leader = _currentLeader ?? UserModel(
+      id: appState.userId ?? '',
+      name: 'Loading...',
+      username: '@loading',
+      profileImageUrl: '',
+      isVerified: false,
+    );
 
     final screens = <Widget>[
-      const LeaderDashboardScreen(),
+      LeaderDashboardScreen(leader: leader,),
       const CreateContentScreen(),
       const MessagesScreen(),
-      LeaderProfileScreen(leader: mockLeader),
+      LeaderProfileScreen(leader: leader),
     ];
 
     final int safeIndex =

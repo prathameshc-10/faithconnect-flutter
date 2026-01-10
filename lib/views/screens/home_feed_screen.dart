@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/feed_provider.dart';
 import '../../providers/posts_provider.dart';
-import '../../models/mock_data.dart';
+import '../../providers/app_state_provider.dart';
 import '../widgets/post_card.dart';
 import '../widgets/comments_bottom_sheet.dart';
 
@@ -70,62 +70,116 @@ class HomeFeedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final feedProvider = Provider.of<FeedProvider>(context);
-    final postsProvider = Provider.of<PostsProvider>(context);
-    final posts = postsProvider.posts;
+    return Consumer3<FeedProvider, PostsProvider, AppStateProvider>(
+      builder: (context, feedProvider, postsProvider, appState, child) {
+        // Load posts when community is available
+        if (appState.community != null && appState.community!.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            postsProvider.loadPosts(appState.community!);
+          });
+        }
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        automaticallyImplyLeading: false,
-        title: const Text(
-          'Home Feed',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
-        actions: [
-          // Profile avatar on the right
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: Colors.grey[300],
-              child: const Icon(
-                Icons.person,
-                color: Colors.grey,
-                size: 20,
+        final posts = postsProvider.posts;
+        final isLoading = postsProvider.isLoading;
+
+        return Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            elevation: 0,
+            backgroundColor: Colors.white,
+            automaticallyImplyLeading: false,
+            title: const Text(
+              'Home Feed',
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
               ),
             ),
+            actions: [
+              // Profile avatar on the right
+              Padding(
+                padding: const EdgeInsets.only(right: 16.0),
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Colors.grey[300],
+                  child: const Icon(
+                    Icons.person,
+                    color: Colors.grey,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(50),
+              child: _buildSegmentedControl(context, feedProvider),
+            ),
           ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(50),
-          child: _buildSegmentedControl(context, feedProvider),
-        ),
-      ),
-      body: ListView.builder(
-        itemCount: posts.length,
-        padding: EdgeInsets.zero,
-        itemBuilder: (context, index) {
-          final post = posts[index];
-          return PostCard(
-            post: post,
-            // Example: Trigger comments bottom sheet when comment button is tapped
-            onComment: () {
-              showCommentsBottomSheet(
-                context,
-                comments: MockData.getMockComments(),
-                postTitle: '${post.author.name}\'s Post',
-              );
-            },
-          );
-        },
-      ),
+          body: isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(),
+                )
+              : posts.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.article_outlined,
+                              size: 64,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No posts yet',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Posts from leaders in your community will appear here',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: () async {
+                        if (appState.community != null) {
+                          await postsProvider.refresh(appState.community!);
+                        }
+                      },
+                      child: ListView.builder(
+                        itemCount: posts.length,
+                        padding: EdgeInsets.zero,
+                        itemBuilder: (context, index) {
+                          final post = posts[index];
+                          return PostCard(
+                            post: post,
+                            onComment: () {
+                              showCommentsBottomSheet(
+                                context,
+                                comments: [], // TODO: Load comments from Firestore
+                                postTitle: '${post.author.name}\'s Post',
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+        );
+      },
     );
   }
 }

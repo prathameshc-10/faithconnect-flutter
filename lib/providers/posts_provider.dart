@@ -1,22 +1,161 @@
+import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
 import 'package:flutter/foundation.dart';
-
-import '../models/mock_data.dart';
 import '../models/post_model.dart';
 import '../models/user_model.dart';
+import '../services/firestore_service.dart';
 
 /// Provider that owns all post content for the app.
 ///
-/// - Initializes from [MockData.getMockPosts]
-/// - Allows leaders to create posts and reels which immediately
-///   appear in worshiper feeds and leader profiles.
+/// - Fetches posts and reels from Firestore
+/// - Filters by community
+/// - Allows leaders to create posts and reels
 class PostsProvider with ChangeNotifier {
-  final List<PostModel> _posts = List.from(MockData.getMockPosts());
+  final FirestoreService _firestoreService = FirestoreService();
+  
+  List<PostModel> _posts = [];
+  List<PostModel> _reels = [];
+  Map<String, UserModel> _authorsCache = {};
+  
+  bool _isLoading = false;
+  String? _community;
 
   List<PostModel> get posts => List.unmodifiable(_posts);
+  List<PostModel> get reels => List.unmodifiable(_reels);
+  bool get isLoading => _isLoading;
 
-  /// All reels (video posts only).
-  List<PostModel> get reels =>
-      _posts.where((post) => post.videoUrl != null).toList();
+  /// Load posts from Firestore filtered by community
+  Future<void> loadPosts(String community) async {
+    if (_community == community && _posts.isNotEmpty) return;
+    
+    _community = community;
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      // Listen to posts stream
+      _firestoreService.getPostsByCommunity(community).listen(
+        (postsData) async {
+          _posts = await _convertPostsData(postsData);
+          notifyListeners();
+        },
+        onError: (error) {
+          debugPrint('Error loading posts: $error');
+          _isLoading = false;
+          notifyListeners();
+        },
+      );
+    } catch (e) {
+      debugPrint('Error loading posts: $e');
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Load reels from Firestore filtered by community
+  Future<void> loadReels(String community) async {
+    try {
+      // Listen to reels stream
+      _firestoreService.getReelsByCommunity(community).listen(
+        (reelsData) async {
+          _reels = await _convertReelsData(reelsData);
+          notifyListeners();
+        },
+        onError: (error) {
+          debugPrint('Error loading reels: $error');
+        },
+      );
+    } catch (e) {
+      debugPrint('Error loading reels: $e');
+    }
+  }
+
+  /// Convert Firestore post data to PostModel
+  Future<List<PostModel>> _convertPostsData(List<Map<String, dynamic>> postsData) async {
+    final posts = <PostModel>[];
+    
+    for (final data in postsData) {
+      final authorId = data['authorId'] as String;
+      final author = await _getAuthor(authorId);
+      
+      if (author == null) continue;
+      
+      final timestamp = data['createdAt'] as firestore.Timestamp?;
+      posts.add(PostModel(
+        id: data['id'] as String,
+        author: author,
+        content: data['content'] as String? ?? '',
+        videoUrl: (data['videoUrl'] as String?)?.isNotEmpty == true 
+            ? data['videoUrl'] as String 
+            : null,
+        imageUrl: (data['imageUrl'] as String?)?.isNotEmpty == true 
+            ? data['imageUrl'] as String 
+            : null,
+        createdAt: timestamp?.toDate() ?? DateTime.now(),
+        likes: (data['likes'] as int?) ?? 0,
+        comments: (data['comments'] as int?) ?? 0,
+        shares: (data['shares'] as int?) ?? 0,
+        views: (data['views'] as int?) ?? 0,
+      ));
+    }
+    
+    return posts;
+  }
+
+  /// Convert Firestore reel data to PostModel
+  Future<List<PostModel>> _convertReelsData(List<Map<String, dynamic>> reelsData) async {
+    final reels = <PostModel>[];
+    
+    for (final data in reelsData) {
+      final authorId = data['authorId'] as String;
+      final author = await _getAuthor(authorId);
+      
+      if (author == null) continue;
+      
+      final timestamp = data['createdAt'] as firestore.Timestamp?;
+      reels.add(PostModel(
+        id: data['id'] as String,
+        author: author,
+        content: data['content'] as String? ?? '',
+        videoUrl: data['videoUrl'] as String? ?? '',
+        createdAt: timestamp?.toDate() ?? DateTime.now(),
+        likes: (data['likes'] as int?) ?? 0,
+        comments: (data['comments'] as int?) ?? 0,
+        shares: (data['shares'] as int?) ?? 0,
+        views: (data['views'] as int?) ?? 0,
+      ));
+    }
+    
+    return reels;
+  }
+
+  /// Get author data from cache or Firestore
+  Future<UserModel?> _getAuthor(String authorId) async {
+    if (_authorsCache.containsKey(authorId)) {
+      return _authorsCache[authorId];
+    }
+
+    try {
+      final leaderData = await _firestoreService.getLeaderData(authorId);
+      if (leaderData != null) {
+        final author = UserModel(
+          id: authorId,
+          name: leaderData['name'] as String? ?? '',
+          username: '@${(leaderData['name'] as String? ?? '').toLowerCase().replaceAll(' ', '_')}',
+          profileImageUrl: leaderData['profileImageUrl'] as String? ?? '',
+          isVerified: false,
+          description: leaderData['bio'] as String?,
+          community: leaderData['community'] as String?,
+          role: leaderData['role'] as String?,
+        );
+        _authorsCache[authorId] = author;
+        return author;
+      }
+    } catch (e) {
+      debugPrint('Error fetching author: $e');
+    }
+
+    return null;
+  }
 
   /// Posts for a specific leader (non‑video).
   List<PostModel> postsForLeader(String leaderId) {
@@ -27,35 +166,18 @@ class PostsProvider with ChangeNotifier {
 
   /// Reels for a specific leader (video posts).
   List<PostModel> reelsForLeader(String leaderId) {
-    return _posts
-        .where((p) => p.author.id == leaderId && p.videoUrl != null)
+    return _reels
+        .where((p) => p.author.id == leaderId)
         .toList();
   }
 
-  /// Add a new post or reel created by a leader.
-  ///
-  /// [isReel] controls whether this is treated as a vertical video reel.
-  void addContent({
-    required UserModel author,
-    required String content,
-    bool isReel = false,
-  }) {
-    final now = DateTime.now();
-    final newPost = PostModel(
-      id: 'p_${now.millisecondsSinceEpoch}',
-      author: author,
-      content: content,
-      videoUrl: isReel ? 'video_url_placeholder' : null,
-      imageUrl: isReel ? null : null,
-      createdAt: now,
-      likes: 0,
-      comments: 0,
-      shares: 0,
-      views: 0,
-    );
-
-    _posts.insert(0, newPost);
-    notifyListeners();
+  /// Refresh posts and reels
+  Future<void> refresh(String community) async {
+    _posts = [];
+    _reels = [];
+    _authorsCache = {};
+    await loadPosts(community);
+    await loadReels(community);
   }
 }
 
