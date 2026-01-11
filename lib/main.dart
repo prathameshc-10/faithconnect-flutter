@@ -2,17 +2,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-// ❌ REMOVED: import 'providers/navigation_provider.dart';
 import 'providers/feed_provider.dart';
 import 'providers/leaders_provider.dart';
 import 'providers/messages_provider.dart';
 import 'providers/app_state_provider.dart';
 import 'providers/posts_provider.dart';
-import 'views/screens/splash_screen.dart';
+import 'views/screens/auth_gate.dart';
 
-/// FaithConnect App
-/// Main entry point for the mobile application
-/// Uses Provider for state management
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -26,7 +22,6 @@ void main() async {
     ),
   );
 
-  // Set system UI overlay style for mobile-only layout
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -35,7 +30,6 @@ void main() async {
     ),
   );
 
-  // Force portrait orientation for mobile-only app
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -44,9 +38,6 @@ void main() async {
   });
 }
 
-/// Root MaterialApp widget
-/// Configured for mobile-only layout with Material Design
-/// Wrapped with Provider for state management
 class FaithConnectApp extends StatelessWidget {
   const FaithConnectApp({super.key});
 
@@ -54,30 +45,18 @@ class FaithConnectApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        // ❌ REMOVED: NavigationProvider (each navigation shell creates its own)
-        
-        // ✅ Global app state provider (auth + role)
         ChangeNotifierProvider(
-          create: (_) => AppStateProvider(),
+          create: (_) => AppStateProvider()..initialize(),
         ),
-        
-        // ✅ Content/posts provider (shared between worshipers and leaders)
         ChangeNotifierProvider(create: (_) => PostsProvider()),
-        
-        // ✅ Feed state provider (Explore/Following tabs)
         ChangeNotifierProvider(create: (_) => FeedProvider()),
-        
-        // ✅ Leaders state provider (My Leaders/Explore tabs)
         ChangeNotifierProvider(create: (_) => LeadersProvider()),
-        
-        // ✅ Messages state provider (mocked, UI-only)
         ChangeNotifierProvider(create: (_) => MessagesProvider()),
       ],
       child: MaterialApp(
         title: 'FaithConnect',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
-          // Material 3 design with clean white background
           useMaterial3: true,
           primarySwatch: Colors.blue,
           scaffoldBackgroundColor: Colors.white,
@@ -99,8 +78,116 @@ class FaithConnectApp extends StatelessWidget {
             brightness: Brightness.light,
           ),
         ),
-        // ✅ Main entry point: Splash screen which routes to AuthGate
-        home: const SplashScreen(),
+        // ✅ Wrap AuthGate with SplashWrapper
+        home: const SplashWrapper(child: AuthGate()),
+      ),
+    );
+  }
+}
+
+/// Wrapper that shows splash screen briefly, then shows child
+class SplashWrapper extends StatefulWidget {
+  final Widget child;
+
+  const SplashWrapper({Key? key, required this.child}) : super(key: key);
+
+  @override
+  State<SplashWrapper> createState() => _SplashWrapperState();
+}
+
+class _SplashWrapperState extends State<SplashWrapper>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fade;
+  bool _showSplash = true;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _fade = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _controller.forward();
+
+    // Hide splash after 2 seconds
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _showSplash = false;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_showSplash) {
+      return _buildSplash();
+    }
+    return widget.child;
+  }
+
+  Widget _buildSplash() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+      body: SafeArea(
+        child: Center(
+          child: FadeTransition(
+            opacity: _fade,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white : Colors.black,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    Icons.auto_awesome_outlined,
+                    color: isDark ? Colors.black : Colors.white,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'FaithConnect',
+                  style: TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  child: Text(
+                    'A platform where Worshipers connect with their Religious Leaders.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.6,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

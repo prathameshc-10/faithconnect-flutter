@@ -6,22 +6,22 @@ import '../../models/post_model.dart';
 /// Matches the reference screenshot layout
 class PostCard extends StatelessWidget {
   final PostModel post;
-  
+
   /// Optional callback for when user taps on the post
   final VoidCallback? onTap;
-  
+
   /// Optional callback for like action
   final VoidCallback? onLike;
-  
+
   /// Optional callback for comment action
   final VoidCallback? onComment;
-  
+
   /// Optional callback for save action
   final VoidCallback? onSave;
-  
+
   /// Optional callback for share action
   final VoidCallback? onShare;
-  
+
   /// Whether the post is liked by the current user
   final bool isLiked;
 
@@ -69,16 +69,19 @@ class PostCard extends StatelessWidget {
         CircleAvatar(
           radius: 20,
           backgroundColor: Colors.grey[300],
-          backgroundImage: post.author.profileImageUrl.isNotEmpty
-              ? NetworkImage(post.author.profileImageUrl)
-              : null,
-          child: post.author.profileImageUrl.isEmpty
-              ? Icon(
-                  Icons.person,
-                  color: post.author.isVerified ? Colors.blue : Colors.grey[600],
-                  size: 20,
-                )
-              : null,
+          backgroundImage:
+              post.author.profileImageUrl.isNotEmpty
+                  ? NetworkImage(post.author.profileImageUrl)
+                  : null,
+          child:
+              post.author.profileImageUrl.isEmpty
+                  ? Icon(
+                    Icons.person,
+                    color:
+                        post.author.isVerified ? Colors.blue : Colors.grey[600],
+                    size: 20,
+                  )
+                  : null,
         ),
         const SizedBox(width: 12),
         // Leader name and timestamp
@@ -101,21 +104,14 @@ class PostCard extends StatelessWidget {
                   ),
                   if (post.author.isVerified) ...[
                     const SizedBox(width: 4),
-                    const Icon(
-                      Icons.verified,
-                      color: Colors.blue,
-                      size: 16,
-                    ),
+                    const Icon(Icons.verified, color: Colors.blue, size: 16),
                   ],
                 ],
               ),
               const SizedBox(height: 2),
               Text(
                 formatTimeAgo(post.createdAt),
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
               ),
             ],
           ),
@@ -170,7 +166,7 @@ class PostCard extends StatelessWidget {
         ],
       );
     }
-    
+
     // Image thumbnail
     if (post.imageUrl != null && post.imageUrl!.isNotEmpty) {
       return Container(
@@ -189,58 +185,49 @@ class PostCard extends StatelessWidget {
               return Container(
                 height: 200,
                 color: Colors.grey[300],
-                child: const Icon(Icons.image_not_supported, color: Colors.grey),
+                child: const Icon(
+                  Icons.image_not_supported,
+                  color: Colors.grey,
+                ),
               );
             },
           ),
         ),
       );
     }
-    
+
     return null;
   }
 
   /// Build action row with like, comment, save, and share icons
   Widget _buildActionRow() {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // Like count
+        // Like
         _buildActionButton(
           icon: isLiked ? Icons.favorite : Icons.favorite_border,
           count: formatNumber(post.likes),
           onTap: onLike,
           isHighlighted: isLiked,
         ),
-        const SizedBox(width: 20),
-        // Comment count
+
+        // Comment
         _buildActionButton(
           icon: Icons.chat_bubble_outline,
           count: formatNumber(post.comments),
           onTap: onComment,
         ),
-        const SizedBox(width: 20),
-        // Save icon
+
+        // Save
         _buildActionButton(
           icon: Icons.bookmark_border,
           onTap: onSave,
           isIconOnly: true,
         ),
-        const SizedBox(width: 20),
-        // Share icon
-        _buildActionButton(
-          icon: Icons.share,
-          onTap: onShare,
-          isIconOnly: true,
-        ),
-        const Spacer(),
-        // Views count (optional, shown in reference)
-        Text(
-          '${formatNumber(post.views)} views',
-          style: TextStyle(
-            color: Colors.grey[600],
-            fontSize: 12,
-          ),
-        ),
+
+        // Share
+        _buildActionButton(icon: Icons.share, onTap: onShare, isIconOnly: true),
       ],
     );
   }
@@ -284,7 +271,7 @@ class PostCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final media = _buildMedia();
-    
+
     return InkWell(
       onTap: onTap,
       child: Card(
@@ -302,13 +289,10 @@ class PostCard extends StatelessWidget {
               // Header: Avatar + Name + Timestamp
               _buildHeader(),
               const SizedBox(height: 12),
-              
+
               // Optional media (video or image thumbnail)
-              if (media != null) ...[
-                media,
-                const SizedBox(height: 12),
-              ],
-              
+              if (media != null) ...[media, const SizedBox(height: 12)],
+
               // Text content
               Text(
                 post.content,
@@ -319,7 +303,7 @@ class PostCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              
+
               // Action row: Like, Comment, Save, Share
               _buildActionRow(),
             ],

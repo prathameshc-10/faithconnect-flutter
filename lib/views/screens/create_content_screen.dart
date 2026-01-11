@@ -339,87 +339,89 @@ class _CreateReelScreenState extends State<_CreateReelScreen> {
       ),
 
       /// BODY
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            /// VIDEO PICKER
-            GestureDetector(
-              onTap: _pickVideo,
-              child: Container(
-                height: 220,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.black12),
-                ),
-                child: Center(
-                  child: _videoFile == null
-                      ? const Icon(
-                          Icons.videocam_outlined,
-                          size: 48,
-                          color: Colors.black54,
-                        )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.check_circle,
-                              size: 40,
-                              color: Colors.black,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _videoFile!.path.split('/').last,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ],
-                        ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            /// CAPTION
-            const Text(
-              'Caption',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _captionController,
-              maxLines: 4,
-              decoration: InputDecoration(
-                hintText: 'Write something inspiring...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.black),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              /// VIDEO PICKER
+              GestureDetector(
+                onTap: _pickVideo,
+                child: Container(
+                  height: 220,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.black12),
+                  ),
+                  child: Center(
+                    child: _videoFile == null
+                        ? const Icon(
+                            Icons.videocam_outlined,
+                            size: 48,
+                            color: Colors.black54,
+                          )
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.check_circle,
+                                size: 40,
+                                color: Colors.black,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _videoFile!.path.split('/').last,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ],
+                          ),
+                  ),
                 ),
               ),
-            ),
-
-            const SizedBox(height: 12),
-
-            /// INFO
-            const Text(
-              'Tap the box above to select a video (max 2 minutes).',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.black54,
+        
+              const SizedBox(height: 20),
+        
+              /// CAPTION
+              const Text(
+                'Caption',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              TextField(
+                controller: _captionController,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: 'Write something inspiring...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.black),
+                  ),
+                ),
+              ),
+        
+              const SizedBox(height: 12),
+        
+              /// INFO
+              const Text(
+                'Tap the box above to select a video (max 2 minutes).',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.black54,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -59,7 +59,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
         community: _selectedCommunity!,
       );
 
-      // ✅ No navigation - AuthGate handles it
+      // 🔥 IMPORTANT
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+
+      // ❌ NO navigation here
+      // AuthGate will rebuild automatically
     } catch (e) {
       if (mounted) {
         setState(() {

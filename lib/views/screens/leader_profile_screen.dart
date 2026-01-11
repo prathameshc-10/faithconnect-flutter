@@ -118,9 +118,9 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
         setState(() {
           _isFollowing = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -143,9 +143,9 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
         setState(() {
           _isFollowing = true;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -164,11 +164,12 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
 
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => ChatScreen(
-            conversationId: conversationId,
-            title: _currentLeader.name,
-            receiverId: widget.leader.id,
-          ),
+          builder:
+              (_) => ChatScreen(
+                conversationId: conversationId,
+                title: _currentLeader.name,
+                receiverId: widget.leader.id,
+              ),
         ),
       );
     } catch (e) {
@@ -202,8 +203,9 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
   /// Load leader data from Firestore
   Future<void> _loadLeaderData() async {
     try {
-      final leaderData =
-          await _firestoreService.getLeaderData(widget.leader.id);
+      final leaderData = await _firestoreService.getLeaderData(
+        widget.leader.id,
+      );
 
       if (!mounted) return;
 
@@ -215,10 +217,10 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
             username:
                 '@${(leaderData['name'] ?? widget.leader.name).toLowerCase().replaceAll(' ', '_')}',
             profileImageUrl: leaderData['profileImageUrl'] ?? '',
-            isVerified: false,
-            description: leaderData['bio'],
+            description: leaderData['bio'] ?? '',
             community: leaderData['community'],
             role: leaderData['role'],
+            isVerified: leaderData['isVerified'] ?? false,
           );
           _isLoading = false;
         });
@@ -226,7 +228,8 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
         _loadedLeader = widget.leader;
         _isLoading = false;
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error loading leader data: $e');
       _loadedLeader = widget.leader;
       _isLoading = false;
     }
@@ -267,20 +270,22 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
 
       if (mounted) {
         setState(() {
-          _loadedLeader = _loadedLeader?.copyWith(profileImageUrl: imageUrl) ?? widget.leader;
+          _loadedLeader =
+              _loadedLeader?.copyWith(profileImageUrl: imageUrl) ??
+              widget.leader;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile image updated')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Profile image updated')));
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _localProfileImage = null;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading image: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error uploading image: $e')));
       }
     }
   }
@@ -316,16 +321,22 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
                 CircleAvatar(
                   radius: 56,
                   backgroundColor: Colors.grey.shade200,
-                  backgroundImage: _localProfileImage != null
-                      ? FileImage(_localProfileImage!)
-                      : (_currentLeader.profileImageUrl.isNotEmpty
-                          ? NetworkImage(_currentLeader.profileImageUrl)
-                          : null) as ImageProvider?,
-                  child: (_localProfileImage == null &&
-                          _currentLeader.profileImageUrl.isEmpty)
-                      ? Icon(Icons.person,
-                          size: 56, color: Colors.grey.shade500)
-                      : null,
+                  backgroundImage:
+                      _localProfileImage != null
+                          ? FileImage(_localProfileImage!)
+                          : (_currentLeader.profileImageUrl.isNotEmpty
+                                  ? NetworkImage(_currentLeader.profileImageUrl)
+                                  : null)
+                              as ImageProvider?,
+                  child:
+                      (_localProfileImage == null &&
+                              _currentLeader.profileImageUrl.isEmpty)
+                          ? Icon(
+                            Icons.person,
+                            size: 56,
+                            color: Colors.grey.shade500,
+                          )
+                          : null,
                 ),
 
                 /// VERIFIED BADGE
@@ -337,8 +348,11 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
                     ),
-                    child: const Icon(Icons.verified,
-                        size: 18, color: Colors.white),
+                    child: const Icon(
+                      Icons.verified,
+                      size: 18,
+                      color: Colors.white,
+                    ),
                   ),
 
                 /// CAMERA ICON (only for own profile)
@@ -353,8 +367,11 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2),
                       ),
-                      child: const Icon(Icons.camera_alt,
-                          size: 16, color: Colors.white),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        size: 16,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
               ],
@@ -366,10 +383,7 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
           /// NAME
           Text(
             _currentLeader.name,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
 
           const SizedBox(height: 6),
@@ -377,10 +391,7 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
           /// USERNAME
           Text(
             _currentLeader.username,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.black54,
-            ),
+            style: const TextStyle(fontSize: 14, color: Colors.black54),
           ),
 
           const SizedBox(height: 16),
@@ -421,9 +432,18 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
                       onPressed: () async {
                         await appState.signOut();
                         if (!mounted) return;
-                        Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (_) => const SignInScreen()),
-                          (_) => false,
+                        // ✅ REPLACE WITH THIS - AuthGate handles navigation
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.logout),
+                          label: const Text('Logout'),
+                          onPressed: () async {
+                            debugPrint('🚪 Logout button pressed');
+                            await appState.signOut();
+                            debugPrint(
+                              '✅ Sign out completed - AuthGate will handle navigation',
+                            );
+                          },
+                          // ... style ...
                         );
                       },
                       style: OutlinedButton.styleFrom(
@@ -456,10 +476,14 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
                   else ...[
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: _isFollowing ? _handleUnfollow : _handleFollow,
+                        onPressed:
+                            _isFollowing ? _handleUnfollow : _handleFollow,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.black,
-                          side: const BorderSide(color: Colors.black, width: 1.5),
+                          side: const BorderSide(
+                            color: Colors.black,
+                            width: 1.5,
+                          ),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -540,26 +564,29 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
         final postsProvider = context.read<PostsProvider>();
         final appState = context.read<AppStateProvider>();
         final isLiked = postsProvider.isPostLiked(post.id);
-        
+
         return PostCard(
           post: post,
           isLiked: isLiked,
-          onLike: appState.userId != null
-              ? () async {
-                  try {
-                    await postsProvider.toggleLike(post, appState.userId!);
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Failed to like post. Please try again.'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
+          onLike:
+              appState.userId != null
+                  ? () async {
+                    try {
+                      await postsProvider.toggleLike(post, appState.userId!);
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Failed to like post. Please try again.',
+                            ),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
                     }
                   }
-                }
-              : null,
+                  : null,
           onComment: () {
             if (appState.userId != null) {
               postsProvider.fetchComments(post.id, isReel: false);
@@ -600,7 +627,11 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.video_library_outlined, size: 64, color: Colors.grey[400]),
+              Icon(
+                Icons.video_library_outlined,
+                size: 64,
+                color: Colors.grey[400],
+              ),
               const SizedBox(height: 16),
               Text(
                 'No reels yet',
@@ -624,26 +655,29 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
         final postsProvider = context.read<PostsProvider>();
         final appState = context.read<AppStateProvider>();
         final isLiked = postsProvider.isReelLiked(reel.id);
-        
+
         return PostCard(
           post: reel,
           isLiked: isLiked,
-          onLike: appState.userId != null
-              ? () async {
-                  try {
-                    await postsProvider.toggleLike(reel, appState.userId!);
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Failed to like reel. Please try again.'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
+          onLike:
+              appState.userId != null
+                  ? () async {
+                    try {
+                      await postsProvider.toggleLike(reel, appState.userId!);
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Failed to like reel. Please try again.',
+                            ),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
                     }
                   }
-                }
-              : null,
+                  : null,
           onComment: () {
             if (appState.userId != null) {
               postsProvider.fetchComments(reel.id, isReel: true);
@@ -681,10 +715,6 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
         title: const Text(
           'Profile',
           style: TextStyle(
@@ -707,35 +737,30 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
                 color: Colors.black,
                 borderRadius: BorderRadius.circular(12),
               ),
+              indicatorSize: TabBarIndicatorSize.tab,
               labelColor: Colors.white,
-              unselectedLabelColor: Colors.black,
-              tabs: const [
-                Tab(text: 'Posts'),
-                Tab(text: 'Reels'),
-              ],
+              unselectedLabelColor: Colors.black87,
+              labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+              unselectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.w500,
+              ),
+              tabs: const [Tab(text: 'Posts'), Tab(text: 'Reels')],
             ),
           ),
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Column(
-                children: [
-                  _buildProfileHeader(),
-                  SizedBox(
-                    height: MediaQuery.of(context).size.height - 200,
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildPostsTab(),
-                        _buildReelsTab(),
-                      ],
-                    ),
-                  ),
-                ],
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : NestedScrollView(
+                headerSliverBuilder: (context, innerBoxIsScrolled) {
+                  return [SliverToBoxAdapter(child: _buildProfileHeader())];
+                },
+                body: TabBarView(
+                  controller: _tabController,
+                  children: [_buildPostsTab(), _buildReelsTab()],
+                ),
               ),
-            ),
     );
   }
 }

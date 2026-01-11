@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_state_provider.dart';
-import '../../providers/user_role_provider.dart';
-import '../widgets/worshiper_main_navigation.dart';
 import 'sign_up_screen.dart';
-import 'leader_profile_setup_screen.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -28,8 +25,14 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   Future<void> _onSignIn() async {
-    if (!_formKey.currentState!.validate()) return;
+    debugPrint('🔐 SignInScreen._onSignIn() called');
+    
+    if (!_formKey.currentState!.validate()) {
+      debugPrint('❌ Form validation failed');
+      return;
+    }
 
+    debugPrint('📝 Setting loading state to true');
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -38,15 +41,27 @@ class _SignInScreenState extends State<SignInScreen> {
     try {
       final appState = context.read<AppStateProvider>();
 
-      // ✅ ONLY do this - NO navigation, NO delays
+      debugPrint('🔑 Calling appState.signIn()...');
       await appState.signIn(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // ✅ AuthGate will automatically handle routing
-      // No Navigator.pushReplacement needed!
+      debugPrint('✅ appState.signIn() completed successfully');
+      
+      // Reset loading state
+      if (mounted) {
+        debugPrint('📝 Resetting loading state to false');
+        setState(() {
+          _isLoading = false;
+        });
+        debugPrint('✅ Loading state reset complete');
+      } else {
+        debugPrint('⚠️  Widget not mounted, cannot reset loading state');
+      }
+      
     } catch (e) {
+      debugPrint('❌ Sign in error: $e');
       if (mounted) {
         setState(() {
           _errorMessage = e.toString().replaceFirst('Exception: ', '');
@@ -58,6 +73,8 @@ class _SignInScreenState extends State<SignInScreen> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('🖼️  SignInScreen.build() called, _isLoading: $_isLoading');
+    
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -222,7 +239,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    "Don’t have an account?",
+                    "Don't have an account?",
                     style: TextStyle(
                       color:
                           isDark ? Colors.grey.shade400 : Colors.grey.shade600,
@@ -325,66 +342,6 @@ class _InputField extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(
             color: isDark ? Colors.grey.shade800 : Colors.grey.shade300,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RoleCard extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _RoleCard({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          decoration: BoxDecoration(
-            color:
-                selected
-                    ? Colors.black
-                    : isDark
-                    ? const Color(0xFF1C1C1E)
-                    : const Color(0xFFF9FAFB),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color:
-                  selected
-                      ? Colors.black
-                      : isDark
-                      ? Colors.grey.shade800
-                      : Colors.grey.shade200,
-              width: 2,
-            ),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: selected ? Colors.white : Colors.grey),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: selected ? Colors.white : null,
-                ),
-              ),
-            ],
           ),
         ),
       ),

@@ -141,10 +141,14 @@ class _WorshiperProfileScreenState extends State<WorshiperProfileScreen> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
-        centerTitle: true,
+        automaticallyImplyLeading: false,
         title: const Text(
           'Profile',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800),
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
         ),
         actions: [
           Padding(

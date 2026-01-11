@@ -173,21 +173,21 @@ class ReligiousLeadersScreen extends StatelessWidget {
                 fontSize: 20,
               ),
             ),
-            actions: [
-              // Profile avatar on the right
-              Padding(
-                padding: const EdgeInsets.only(right: 16.0),
-                child: CircleAvatar(
-                  radius: 18,
-                  backgroundColor: Colors.grey[300],
-                  child: const Icon(
-                    Icons.person,
-                    color: Colors.grey,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ],
+            // actions: [
+            //   // Profile avatar on the right
+            //   Padding(
+            //     padding: const EdgeInsets.only(right: 16.0),
+            //     child: CircleAvatar(
+            //       radius: 18,
+            //       backgroundColor: Colors.grey[300],
+            //       child: const Icon(
+            //         Icons.person,
+            //         color: Colors.grey,
+            //         size: 20,
+            //       ),
+            //     ),
+            //   ),
+            // ],
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(50),
               child: _buildSegmentedControl(context, provider),

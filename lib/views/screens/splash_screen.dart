@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_state_provider.dart';
 
-
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -39,23 +38,22 @@ class _SplashScreenState extends State<SplashScreen>
     _initializeAndNavigate();
   }
 
-Future<void> _initializeAndNavigate() async {
-  // Initialize app state (check if user is already signed in)
-  final appState = context.read<AppStateProvider>();
-  await appState.initialize();
+  Future<void> _initializeAndNavigate() async {
+    // Initialize app state (check if user is already signed in)
+    final appState = context.read<AppStateProvider>();
+    await appState.initialize();
 
-  // Wait for splash animation
-  await Future.delayed(const Duration(seconds: 2));
+    // Wait for splash animation
+    await Future.delayed(const Duration(seconds: 2));
 
-  if (!mounted) return;
+    if (!mounted) return;
 
-  // ✅ Just navigate to AuthGate - it handles everything
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(builder: (_) => const AuthGate()),
-  );
-}
-  
+    // ✅ Just navigate to AuthGate - it handles everything
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthGate()),
+      (route) => false, // Remove all previous routes
+    );
+  }
 
   @override
   void dispose() {
