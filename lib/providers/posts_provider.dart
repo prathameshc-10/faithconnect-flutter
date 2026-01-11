@@ -53,6 +53,12 @@ class PostsProvider with ChangeNotifier {
   /// Check if comments are loading for a post
   bool isLoadingComments(String postId) => 
       _isLoadingComments[postId] ?? false;
+  
+  /// Cache the current user for comment functionality
+  /// Call this after user logs in to ensure comments work for both leaders and worshipers
+  void cacheCurrentUser(UserModel user) {
+    _authorsCache[user.id] = user;
+  }
 
   /// Load posts from Firestore filtered by community
   Future<void> loadPosts(String community) async {
@@ -175,12 +181,14 @@ class PostsProvider with ChangeNotifier {
   }
 
   /// Get author data from cache or Firestore
+  /// Checks both leaders and worshipers collections
   Future<UserModel?> _getAuthor(String authorId) async {
     if (_authorsCache.containsKey(authorId)) {
       return _authorsCache[authorId];
     }
 
     try {
+      // Try leader first
       final leaderData = await _firestoreService.getLeaderData(authorId);
       if (leaderData != null) {
         final author = UserModel(
@@ -192,6 +200,23 @@ class PostsProvider with ChangeNotifier {
           description: leaderData['bio'] as String?,
           community: leaderData['community'] as String?,
           role: leaderData['role'] as String?,
+        );
+        _authorsCache[authorId] = author;
+        return author;
+      }
+      
+      // Try worshiper if not a leader
+      final worshiperData = await _firestoreService.getWorshiperData(authorId);
+      if (worshiperData != null) {
+        final author = UserModel(
+          id: authorId,
+          name: worshiperData['name'] as String? ?? '',
+          username: '@${(worshiperData['name'] as String? ?? '').toLowerCase().replaceAll(' ', '_')}',
+          profileImageUrl: worshiperData['profileImageUrl'] as String? ?? '',
+          isVerified: false,
+          description: null,
+          community: worshiperData['community'] as String?,
+          role: 'worshiper',
         );
         _authorsCache[authorId] = author;
         return author;
@@ -521,24 +546,23 @@ class PostsProvider with ChangeNotifier {
     if (text.trim().isEmpty) return;
     
     try {
-      // Optimistically add comment to UI
-      final author = await _getAuthor(userId);
-      if (author == null) {
-        throw Exception('Author not found');
+      // Write comment to Firestore with userId (no author fetch needed)
+      // Comment will appear via stream subscription with author resolved
+      if (isReel) {
+        await _firestoreService.addReelComment(
+          reelId: postId,
+          userId: userId,
+          text: text.trim(),
+        );
+      } else {
+        await _firestoreService.addComment(
+          postId: postId,
+          userId: userId,
+          text: text.trim(),
+        );
       }
       
-      final newComment = CommentModel(
-        id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
-        userId: userId,
-        text: text.trim(),
-        createdAt: DateTime.now(),
-        author: author,
-      );
-      
-      final currentComments = _commentsCache[postId] ?? [];
-      _commentsCache[postId] = [newComment, ...currentComments];
-      
-      // Update comment count optimistically
+      // Update comment count optimistically (comment will appear via stream)
       final isReelPost = _reels.any((p) => p.id == postId);
       if (isReelPost) {
         final index = _reels.indexWhere((p) => p.id == postId);
@@ -578,32 +602,11 @@ class PostsProvider with ChangeNotifier {
       
       notifyListeners();
       
-      // Add comment to Firestore
-      if (isReel) {
-        await _firestoreService.addReelComment(
-          reelId: postId,
-          userId: userId,
-          text: text.trim(),
-        );
-      } else {
-        await _firestoreService.addComment(
-          postId: postId,
-          userId: userId,
-          text: text.trim(),
-        );
-      }
-      
-      // Comment will be updated via stream, so we don't need to manually update
+      // Comment will appear via stream subscription, so no manual UI update needed
     } catch (e) {
       debugPrint('Error adding comment: $e');
       
-      // Roll back optimistic update
-      final currentComments = _commentsCache[postId] ?? [];
-      if (currentComments.isNotEmpty && currentComments.first.id.startsWith('temp_')) {
-        _commentsCache[postId] = currentComments.skip(1).toList();
-      }
-      
-      // Roll back comment count
+      // Roll back comment count on error
       final isReelPost = _reels.any((p) => p.id == postId);
       if (isReelPost) {
         final index = _reels.indexWhere((p) => p.id == postId);
