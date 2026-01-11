@@ -511,4 +511,18 @@ class FirestoreService {
     }
     await batch.commit();
   }
+
+  /// Increment share count for a post
+  Future<void> sharePost(String postId) async {
+    await _postsCollection.doc(postId).update({
+      'shares': firestore.FieldValue.increment(1),
+    });
+  }
+
+  /// Increment share count for a reel
+  Future<void> shareReel(String reelId) async {
+    await _reelsCollection.doc(reelId).update({
+      'shares': firestore.FieldValue.increment(1),
+    });
+  }
 }

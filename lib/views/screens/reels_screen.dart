@@ -79,7 +79,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
   }
 
   /// Build a single reel item with video player
-  Widget _buildReelItem(PostModel reel, int index, double bottomNavHeight) {
+  Widget _buildReelItem(PostModel reel, int index, double bottomNavHeight, PostsProvider postsProvider, BuildContext context) {
     final videoController = _videoControllers[index];
     final hasVideo = reel.videoUrl != null && reel.videoUrl!.isNotEmpty;
 
@@ -305,7 +305,18 @@ class _ReelsScreenState extends State<ReelsScreen> {
               _buildActionButton(
                 icon: Icons.share,
                 count: _formatNumber(reel.shares),
-                onTap: () {},
+                onTap: () async {
+                  final success = await postsProvider.share(reel, isReel: true);
+                  if (!success && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Failed to share reel. Please try again.'),
+                        duration: Duration(seconds: 2),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
               ),
             ],
           ),
@@ -409,7 +420,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
               itemCount: reels.length,
               onPageChanged: _onPageChanged,
               itemBuilder: (context, index) {
-                return _buildReelItem(reels[index], index, bottomNavHeight);
+                return _buildReelItem(reels[index], index, bottomNavHeight, postsProvider, context);
               },
             ),
           ),

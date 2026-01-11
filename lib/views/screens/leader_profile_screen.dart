@@ -535,16 +535,31 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
     return ListView.builder(
       padding: EdgeInsets.zero,
       itemCount: posts.length,
-      itemBuilder: (_, i) => PostCard(
-        post: posts[i],
-        onComment: () {
-          showCommentsBottomSheet(
-            context,
-            comments: [],
-            postTitle: '${_currentLeader.name}\'s Post',
-          );
-        },
-      ),
+      itemBuilder: (_, i) {
+        final post = posts[i];
+        final postsProvider = context.read<PostsProvider>();
+        return PostCard(
+          post: post,
+          onComment: () {
+            showCommentsBottomSheet(
+              context,
+              comments: [],
+              postTitle: '${_currentLeader.name}\'s Post',
+            );
+          },
+          onShare: () async {
+            final success = await postsProvider.share(post, isReel: false);
+            if (!success && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Failed to share post. Please try again.'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+          },
+        );
+      },
     );
   }
 
@@ -577,16 +592,31 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
     return ListView.builder(
       padding: EdgeInsets.zero,
       itemCount: reels.length,
-      itemBuilder: (_, i) => PostCard(
-        post: reels[i],
-        onComment: () {
-          showCommentsBottomSheet(
-            context,
-            comments: [],
-            postTitle: '${_currentLeader.name}\'s Reel',
-          );
-        },
-      ),
+      itemBuilder: (_, i) {
+        final reel = reels[i];
+        final postsProvider = context.read<PostsProvider>();
+        return PostCard(
+          post: reel,
+          onComment: () {
+            showCommentsBottomSheet(
+              context,
+              comments: [],
+              postTitle: '${_currentLeader.name}\'s Reel',
+            );
+          },
+          onShare: () async {
+            final success = await postsProvider.share(reel, isReel: true);
+            if (!success && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Failed to share reel. Please try again.'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+          },
+        );
+      },
     );
   }
 
