@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../models/post_model.dart';
 import '../models/user_model.dart';
 import '../services/firestore_service.dart';
+import '../services/share_service.dart';
 
 /// Provider that owns all post content for the app.
 ///
@@ -12,6 +13,7 @@ import '../services/firestore_service.dart';
 /// - Allows leaders to create posts and reels
 class PostsProvider with ChangeNotifier {
   final FirestoreService _firestoreService = FirestoreService();
+  final ShareService _shareService = ShareService();
   
   List<PostModel> _posts = [];
   List<PostModel> _reels = [];
@@ -200,6 +202,80 @@ class PostsProvider with ChangeNotifier {
     _community = null;
     await loadPosts(community);
     await loadReels(community);
+  }
+
+  /// Share a post or reel
+  /// Opens the native share sheet and increments the share count on success
+  /// 
+  /// [post] - The post or reel to share
+  /// [isReel] - Whether this is a reel (true) or a post (false)
+  /// 
+  /// Returns true if share was successful, false otherwise
+  Future<bool> share(PostModel post, {bool isReel = false}) async {
+    try {
+      // Build share message
+      final shareMessage = post.videoUrl != null && post.videoUrl!.isNotEmpty
+          ? '${post.content}\n\nWatch here 👇\n${post.videoUrl}'
+          : post.content;
+
+      // Open native share sheet
+      final shareSuccess = await _shareService.sharePost(
+        text: post.content,
+        videoUrl: post.videoUrl,
+      );
+
+      if (shareSuccess) {
+        // Increment share count in Firestore
+        if (isReel) {
+          await _firestoreService.shareReel(post.id);
+        } else {
+          await _firestoreService.sharePost(post.id);
+        }
+
+        // Optimistically update local state
+        if (isReel) {
+          final index = _reels.indexWhere((p) => p.id == post.id);
+          if (index != -1) {
+            _reels[index] = PostModel(
+              id: post.id,
+              author: post.author,
+              content: post.content,
+              videoUrl: post.videoUrl,
+              imageUrl: post.imageUrl,
+              createdAt: post.createdAt,
+              likes: post.likes,
+              comments: post.comments,
+              shares: post.shares + 1,
+              views: post.views,
+            );
+          }
+        } else {
+          final index = _posts.indexWhere((p) => p.id == post.id);
+          if (index != -1) {
+            _posts[index] = PostModel(
+              id: post.id,
+              author: post.author,
+              content: post.content,
+              videoUrl: post.videoUrl,
+              imageUrl: post.imageUrl,
+              createdAt: post.createdAt,
+              likes: post.likes,
+              comments: post.comments,
+              shares: post.shares + 1,
+              views: post.views,
+            );
+          }
+        }
+
+        notifyListeners();
+        return true;
+      }
+
+      return false;
+    } catch (e) {
+      debugPrint('Error sharing post: $e');
+      return false;
+    }
   }
 
   @override

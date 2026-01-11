@@ -182,6 +182,17 @@ class HomeFeedScreen extends StatelessWidget {
                                 postTitle: '${post.author.name}\'s Post',
                               );
                             },
+                            onShare: () async {
+                              final success = await postsProvider.share(post, isReel: false);
+                              if (!success && context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Failed to share post. Please try again.'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              }
+                            },
                           );
                         },
                       ),
