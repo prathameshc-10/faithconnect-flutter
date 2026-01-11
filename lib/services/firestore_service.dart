@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
+import 'package:flutter/foundation.dart';
 import '../constants/communities.dart';
 import '../providers/user_role_provider.dart';
 
@@ -523,6 +524,301 @@ class FirestoreService {
   Future<void> shareReel(String reelId) async {
     await _reelsCollection.doc(reelId).update({
       'shares': firestore.FieldValue.increment(1),
+    });
+  }
+
+  /// Check if a post is liked by a user
+  Future<bool> isPostLiked({
+    required String postId,
+    required String userId,
+  }) async {
+    try {
+      final likeDoc = await _postsCollection
+          .doc(postId)
+          .collection('likes')
+          .doc(userId)
+          .get();
+      return likeDoc.exists;
+    } catch (e) {
+      debugPrint('Error checking if post is liked: $e');
+      return false;
+    }
+  }
+
+  /// Check if a reel is liked by a user
+  Future<bool> isReelLiked({
+    required String reelId,
+    required String userId,
+  }) async {
+    try {
+      final likeDoc = await _reelsCollection
+          .doc(reelId)
+          .collection('likes')
+          .doc(userId)
+          .get();
+      return likeDoc.exists;
+    } catch (e) {
+      debugPrint('Error checking if reel is liked: $e');
+      return false;
+    }
+  }
+
+  /// Like a post
+  Future<void> likePost({
+    required String postId,
+    required String userId,
+  }) async {
+    try {
+      final postRef = _postsCollection.doc(postId);
+      final likeRef = postRef.collection('likes').doc(userId);
+
+      // Use transaction to ensure atomicity
+      await _firestore.runTransaction((transaction) async {
+        final postDoc = await transaction.get(postRef);
+        if (!postDoc.exists) {
+          throw Exception('Post does not exist');
+        }
+
+        final likeDoc = await transaction.get(likeRef);
+        if (likeDoc.exists) {
+          // Already liked, do nothing
+          return;
+        }
+
+        // Add like document
+        transaction.set(likeRef, {
+          'likedAt': firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Increment likes count
+        final currentLikes = (postDoc.data()?['likes'] as int?) ?? 0;
+        transaction.update(postRef, {
+          'likes': firestore.FieldValue.increment(1),
+        });
+      });
+    } catch (e) {
+      debugPrint('Error liking post: $e');
+      rethrow;
+    }
+  }
+
+  /// Like a reel
+  Future<void> likeReel({
+    required String reelId,
+    required String userId,
+  }) async {
+    try {
+      final reelRef = _reelsCollection.doc(reelId);
+      final likeRef = reelRef.collection('likes').doc(userId);
+
+      // Use transaction to ensure atomicity
+      await _firestore.runTransaction((transaction) async {
+        final reelDoc = await transaction.get(reelRef);
+        if (!reelDoc.exists) {
+          throw Exception('Reel does not exist');
+        }
+
+        final likeDoc = await transaction.get(likeRef);
+        if (likeDoc.exists) {
+          // Already liked, do nothing
+          return;
+        }
+
+        // Add like document
+        transaction.set(likeRef, {
+          'likedAt': firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Increment likes count
+        transaction.update(reelRef, {
+          'likes': firestore.FieldValue.increment(1),
+        });
+      });
+    } catch (e) {
+      debugPrint('Error liking reel: $e');
+      rethrow;
+    }
+  }
+
+  /// Unlike a post
+  Future<void> unlikePost({
+    required String postId,
+    required String userId,
+  }) async {
+    try {
+      final postRef = _postsCollection.doc(postId);
+      final likeRef = postRef.collection('likes').doc(userId);
+
+      // Use transaction to ensure atomicity
+      await _firestore.runTransaction((transaction) async {
+        final postDoc = await transaction.get(postRef);
+        if (!postDoc.exists) {
+          throw Exception('Post does not exist');
+        }
+
+        final likeDoc = await transaction.get(likeRef);
+        if (!likeDoc.exists) {
+          // Not liked, do nothing
+          return;
+        }
+
+        // Remove like document
+        transaction.delete(likeRef);
+
+        // Decrement likes count (prevent negative)
+        final currentLikes = (postDoc.data()?['likes'] as int?) ?? 0;
+        if (currentLikes > 0) {
+          transaction.update(postRef, {
+            'likes': firestore.FieldValue.increment(-1),
+          });
+        }
+      });
+    } catch (e) {
+      debugPrint('Error unliking post: $e');
+      rethrow;
+    }
+  }
+
+  /// Unlike a reel
+  Future<void> unlikeReel({
+    required String reelId,
+    required String userId,
+  }) async {
+    try {
+      final reelRef = _reelsCollection.doc(reelId);
+      final likeRef = reelRef.collection('likes').doc(userId);
+
+      // Use transaction to ensure atomicity
+      await _firestore.runTransaction((transaction) async {
+        final reelDoc = await transaction.get(reelRef);
+        if (!reelDoc.exists) {
+          throw Exception('Reel does not exist');
+        }
+
+        final likeDoc = await transaction.get(likeRef);
+        if (!likeDoc.exists) {
+          // Not liked, do nothing
+          return;
+        }
+
+        // Remove like document
+        transaction.delete(likeRef);
+
+        // Decrement likes count (prevent negative)
+        final currentLikes = (reelDoc.data()?['likes'] as int?) ?? 0;
+        if (currentLikes > 0) {
+          transaction.update(reelRef, {
+            'likes': firestore.FieldValue.increment(-1),
+          });
+        }
+      });
+    } catch (e) {
+      debugPrint('Error unliking reel: $e');
+      rethrow;
+    }
+  }
+
+  /// Add a comment to a post
+  Future<void> addComment({
+    required String postId,
+    required String userId,
+    required String text,
+  }) async {
+    try {
+      final postRef = _postsCollection.doc(postId);
+      final commentsRef = postRef.collection('comments');
+
+      // Use transaction to ensure atomicity
+      await _firestore.runTransaction((transaction) async {
+        final postDoc = await transaction.get(postRef);
+        if (!postDoc.exists) {
+          throw Exception('Post does not exist');
+        }
+
+        // Add comment document
+        final commentRef = commentsRef.doc();
+        transaction.set(commentRef, {
+          'userId': userId,
+          'text': text,
+          'createdAt': firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Increment comments count
+        transaction.update(postRef, {
+          'comments': firestore.FieldValue.increment(1),
+        });
+      });
+    } catch (e) {
+      debugPrint('Error adding comment: $e');
+      rethrow;
+    }
+  }
+
+  /// Add a comment to a reel
+  Future<void> addReelComment({
+    required String reelId,
+    required String userId,
+    required String text,
+  }) async {
+    try {
+      final reelRef = _reelsCollection.doc(reelId);
+      final commentsRef = reelRef.collection('comments');
+
+      // Use transaction to ensure atomicity
+      await _firestore.runTransaction((transaction) async {
+        final reelDoc = await transaction.get(reelRef);
+        if (!reelDoc.exists) {
+          throw Exception('Reel does not exist');
+        }
+
+        // Add comment document
+        final commentRef = commentsRef.doc();
+        transaction.set(commentRef, {
+          'userId': userId,
+          'text': text,
+          'createdAt': firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Increment comments count
+        transaction.update(reelRef, {
+          'comments': firestore.FieldValue.increment(1),
+        });
+      });
+    } catch (e) {
+      debugPrint('Error adding reel comment: $e');
+      rethrow;
+    }
+  }
+
+  /// Get comments for a post
+  Stream<List<Map<String, dynamic>>> getPostComments(String postId) {
+    return _postsCollection
+        .doc(postId)
+        .collection('comments')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+    });
+  }
+
+  /// Get comments for a reel
+  Stream<List<Map<String, dynamic>>> getReelComments(String reelId) {
+    return _reelsCollection
+        .doc(reelId)
+        .collection('comments')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        return data;
+      }).toList();
     });
   }
 }

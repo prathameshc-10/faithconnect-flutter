@@ -538,24 +538,51 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
       itemBuilder: (_, i) {
         final post = posts[i];
         final postsProvider = context.read<PostsProvider>();
+        final appState = context.read<AppStateProvider>();
+        final isLiked = postsProvider.isPostLiked(post.id);
+        
         return PostCard(
           post: post,
+          isLiked: isLiked,
+          onLike: appState.userId != null
+              ? () async {
+                  try {
+                    await postsProvider.toggleLike(post, appState.userId!);
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Failed to like post. Please try again.'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  }
+                }
+              : null,
           onComment: () {
-            showCommentsBottomSheet(
-              context,
-              comments: [],
-              postTitle: '${_currentLeader.name}\'s Post',
-            );
+            if (appState.userId != null) {
+              postsProvider.fetchComments(post.id, isReel: false);
+              showCommentsBottomSheet(
+                context,
+                postId: post.id,
+                postTitle: '${_currentLeader.name}\'s Post',
+                isReel: false,
+              );
+            }
           },
           onShare: () async {
-            final success = await postsProvider.share(post, isReel: false);
-            if (!success && context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Failed to share post. Please try again.'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
+            try {
+              await postsProvider.share(post);
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to share post. Please try again.'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
             }
           },
         );
@@ -595,24 +622,51 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
       itemBuilder: (_, i) {
         final reel = reels[i];
         final postsProvider = context.read<PostsProvider>();
+        final appState = context.read<AppStateProvider>();
+        final isLiked = postsProvider.isReelLiked(reel.id);
+        
         return PostCard(
           post: reel,
+          isLiked: isLiked,
+          onLike: appState.userId != null
+              ? () async {
+                  try {
+                    await postsProvider.toggleLike(reel, appState.userId!);
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Failed to like reel. Please try again.'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  }
+                }
+              : null,
           onComment: () {
-            showCommentsBottomSheet(
-              context,
-              comments: [],
-              postTitle: '${_currentLeader.name}\'s Reel',
-            );
+            if (appState.userId != null) {
+              postsProvider.fetchComments(reel.id, isReel: true);
+              showCommentsBottomSheet(
+                context,
+                postId: reel.id,
+                postTitle: '${_currentLeader.name}\'s Reel',
+                isReel: true,
+              );
+            }
           },
           onShare: () async {
-            final success = await postsProvider.share(reel, isReel: true);
-            if (!success && context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Failed to share reel. Please try again.'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
+            try {
+              await postsProvider.share(reel);
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to share reel. Please try again.'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
             }
           },
         );

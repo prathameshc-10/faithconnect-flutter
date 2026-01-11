@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
 import 'package:flutter/foundation.dart';
 import '../models/post_model.dart';
 import '../models/user_model.dart';
+import '../models/comment_model.dart';
 import '../services/firestore_service.dart';
 import '../services/share_service.dart';
 
@@ -24,10 +25,34 @@ class PostsProvider with ChangeNotifier {
   
   StreamSubscription? _postsSubscription;
   StreamSubscription? _reelsSubscription;
+  
+  // Like state
+  Set<String> _likedPostIds = {};
+  Set<String> _likedReelIds = {};
+  Map<String, StreamSubscription> _likeSubscriptions = {};
+  
+  // Comment state
+  Map<String, List<CommentModel>> _commentsCache = {};
+  Map<String, StreamSubscription> _commentSubscriptions = {};
+  Map<String, bool> _isLoadingComments = {};
 
   List<PostModel> get posts => List.unmodifiable(_posts);
   List<PostModel> get reels => List.unmodifiable(_reels);
   bool get isLoading => _isLoading;
+  
+  /// Check if a post is liked by the current user
+  bool isPostLiked(String postId) => _likedPostIds.contains(postId);
+  
+  /// Check if a reel is liked by the current user
+  bool isReelLiked(String reelId) => _likedReelIds.contains(reelId);
+  
+  /// Get comments for a post
+  List<CommentModel> getComments(String postId) => 
+      _commentsCache[postId] ?? [];
+  
+  /// Check if comments are loading for a post
+  bool isLoadingComments(String postId) => 
+      _isLoadingComments[postId] ?? false;
 
   /// Load posts from Firestore filtered by community
   Future<void> loadPosts(String community) async {
@@ -208,16 +233,9 @@ class PostsProvider with ChangeNotifier {
   /// Opens the native share sheet and increments the share count on success
   /// 
   /// [post] - The post or reel to share
-  /// [isReel] - Whether this is a reel (true) or a post (false)
-  /// 
-  /// Returns true if share was successful, false otherwise
-  Future<bool> share(PostModel post, {bool isReel = false}) async {
+  /// Automatically detects if it's a post or reel based on which list contains it
+  Future<void> share(PostModel post) async {
     try {
-      // Build share message
-      final shareMessage = post.videoUrl != null && post.videoUrl!.isNotEmpty
-          ? '${post.content}\n\nWatch here 👇\n${post.videoUrl}'
-          : post.content;
-
       // Open native share sheet
       final shareSuccess = await _shareService.sharePost(
         text: post.content,
@@ -225,6 +243,9 @@ class PostsProvider with ChangeNotifier {
       );
 
       if (shareSuccess) {
+        // Determine if it's a reel or post by checking which list contains it
+        final isReel = _reels.any((p) => p.id == post.id);
+        
         // Increment share count in Firestore
         if (isReel) {
           await _firestoreService.shareReel(post.id);
@@ -268,13 +289,360 @@ class PostsProvider with ChangeNotifier {
         }
 
         notifyListeners();
-        return true;
       }
-
-      return false;
+      // If share failed, do nothing (error handling in UI)
     } catch (e) {
       debugPrint('Error sharing post: $e');
-      return false;
+      // Re-throw to allow UI to handle error
+      rethrow;
+    }
+  }
+
+  /// Toggle like on a post or reel
+  /// [post] - The post or reel to like/unlike
+  /// [userId] - The current user's ID
+  Future<void> toggleLike(PostModel post, String userId) async {
+    try {
+      final isReel = _reels.any((p) => p.id == post.id);
+      final isLiked = isReel 
+          ? _likedReelIds.contains(post.id)
+          : _likedPostIds.contains(post.id);
+      
+      // Optimistically update UI
+      if (isReel) {
+        if (isLiked) {
+          _likedReelIds.remove(post.id);
+        } else {
+          _likedReelIds.add(post.id);
+        }
+      } else {
+        if (isLiked) {
+          _likedPostIds.remove(post.id);
+        } else {
+          _likedPostIds.add(post.id);
+        }
+      }
+      
+      // Update local post/reel model
+      final newLikes = isLiked ? post.likes - 1 : post.likes + 1;
+      final updatedPost = PostModel(
+        id: post.id,
+        author: post.author,
+        content: post.content,
+        videoUrl: post.videoUrl,
+        imageUrl: post.imageUrl,
+        createdAt: post.createdAt,
+        likes: newLikes < 0 ? 0 : newLikes,
+        comments: post.comments,
+        shares: post.shares,
+        views: post.views,
+      );
+      
+      if (isReel) {
+        final index = _reels.indexWhere((p) => p.id == post.id);
+        if (index != -1) {
+          _reels[index] = updatedPost;
+        }
+      } else {
+        final index = _posts.indexWhere((p) => p.id == post.id);
+        if (index != -1) {
+          _posts[index] = updatedPost;
+        }
+      }
+      
+      notifyListeners();
+      
+      // Update Firestore
+      if (isReel) {
+        if (isLiked) {
+          await _firestoreService.unlikeReel(
+            reelId: post.id,
+            userId: userId,
+          );
+        } else {
+          await _firestoreService.likeReel(
+            reelId: post.id,
+            userId: userId,
+          );
+        }
+      } else {
+        if (isLiked) {
+          await _firestoreService.unlikePost(
+            postId: post.id,
+            userId: userId,
+          );
+        } else {
+          await _firestoreService.likePost(
+            postId: post.id,
+            userId: userId,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error toggling like: $e');
+      // Roll back optimistic update
+      final isReel = _reels.any((p) => p.id == post.id);
+      final wasLiked = isReel 
+          ? !_likedReelIds.contains(post.id)
+          : !_likedPostIds.contains(post.id);
+      
+      if (isReel) {
+        if (wasLiked) {
+          _likedReelIds.add(post.id);
+        } else {
+          _likedReelIds.remove(post.id);
+        }
+      } else {
+        if (wasLiked) {
+          _likedPostIds.add(post.id);
+        } else {
+          _likedPostIds.remove(post.id);
+        }
+      }
+      
+      // Restore original post
+      if (isReel) {
+        final index = _reels.indexWhere((p) => p.id == post.id);
+        if (index != -1) {
+          _reels[index] = post;
+        }
+      } else {
+        final index = _posts.indexWhere((p) => p.id == post.id);
+        if (index != -1) {
+          _posts[index] = post;
+        }
+      }
+      
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Load liked status for posts and reels
+  /// Call this when user logs in or when loading posts
+  Future<void> loadLikedStatus(String userId) async {
+    try {
+      // Load liked posts
+      for (final post in _posts) {
+        final isLiked = await _firestoreService.isPostLiked(
+          postId: post.id,
+          userId: userId,
+        );
+        if (isLiked) {
+          _likedPostIds.add(post.id);
+        }
+      }
+      
+      // Load liked reels
+      for (final reel in _reels) {
+        final isLiked = await _firestoreService.isReelLiked(
+          reelId: reel.id,
+          userId: userId,
+        );
+        if (isLiked) {
+          _likedReelIds.add(reel.id);
+        }
+      }
+      
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading liked status: $e');
+    }
+  }
+
+  /// Fetch comments for a post or reel
+  /// [postId] - The post or reel ID
+  /// [isReel] - Whether this is a reel (true) or post (false)
+  Future<void> fetchComments(String postId, {bool isReel = false}) async {
+    // Cancel existing subscription if any
+    _commentSubscriptions[postId]?.cancel();
+    
+    _isLoadingComments[postId] = true;
+    notifyListeners();
+    
+    try {
+      Stream<List<Map<String, dynamic>>> commentsStream;
+      if (isReel) {
+        commentsStream = _firestoreService.getReelComments(postId);
+      } else {
+        commentsStream = _firestoreService.getPostComments(postId);
+      }
+      
+      _commentSubscriptions[postId] = commentsStream.listen(
+        (commentsData) async {
+          final comments = <CommentModel>[];
+          
+          for (final data in commentsData) {
+            final comment = CommentModel.fromFirestore(data, data['id'] as String);
+            
+            // Load author data
+            final authorId = comment.userId;
+            final author = await _getAuthor(authorId);
+            
+            if (author != null) {
+              comments.add(CommentModel(
+                id: comment.id,
+                userId: comment.userId,
+                text: comment.text,
+                createdAt: comment.createdAt,
+                author: author,
+              ));
+            }
+          }
+          
+          _commentsCache[postId] = comments;
+          _isLoadingComments[postId] = false;
+          notifyListeners();
+        },
+        onError: (error) {
+          debugPrint('Error fetching comments: $error');
+          _isLoadingComments[postId] = false;
+          notifyListeners();
+        },
+      );
+    } catch (e) {
+      debugPrint('Error fetching comments: $e');
+      _isLoadingComments[postId] = false;
+      notifyListeners();
+    }
+  }
+
+  /// Add a comment to a post or reel
+  /// [postId] - The post or reel ID
+  /// [userId] - The current user's ID
+  /// [text] - The comment text
+  /// [isReel] - Whether this is a reel (true) or post (false)
+  Future<void> addComment({
+    required String postId,
+    required String userId,
+    required String text,
+    bool isReel = false,
+  }) async {
+    if (text.trim().isEmpty) return;
+    
+    try {
+      // Optimistically add comment to UI
+      final author = await _getAuthor(userId);
+      if (author == null) {
+        throw Exception('Author not found');
+      }
+      
+      final newComment = CommentModel(
+        id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+        userId: userId,
+        text: text.trim(),
+        createdAt: DateTime.now(),
+        author: author,
+      );
+      
+      final currentComments = _commentsCache[postId] ?? [];
+      _commentsCache[postId] = [newComment, ...currentComments];
+      
+      // Update comment count optimistically
+      final isReelPost = _reels.any((p) => p.id == postId);
+      if (isReelPost) {
+        final index = _reels.indexWhere((p) => p.id == postId);
+        if (index != -1) {
+          final post = _reels[index];
+          _reels[index] = PostModel(
+            id: post.id,
+            author: post.author,
+            content: post.content,
+            videoUrl: post.videoUrl,
+            imageUrl: post.imageUrl,
+            createdAt: post.createdAt,
+            likes: post.likes,
+            comments: post.comments + 1,
+            shares: post.shares,
+            views: post.views,
+          );
+        }
+      } else {
+        final index = _posts.indexWhere((p) => p.id == postId);
+        if (index != -1) {
+          final post = _posts[index];
+          _posts[index] = PostModel(
+            id: post.id,
+            author: post.author,
+            content: post.content,
+            videoUrl: post.videoUrl,
+            imageUrl: post.imageUrl,
+            createdAt: post.createdAt,
+            likes: post.likes,
+            comments: post.comments + 1,
+            shares: post.shares,
+            views: post.views,
+          );
+        }
+      }
+      
+      notifyListeners();
+      
+      // Add comment to Firestore
+      if (isReel) {
+        await _firestoreService.addReelComment(
+          reelId: postId,
+          userId: userId,
+          text: text.trim(),
+        );
+      } else {
+        await _firestoreService.addComment(
+          postId: postId,
+          userId: userId,
+          text: text.trim(),
+        );
+      }
+      
+      // Comment will be updated via stream, so we don't need to manually update
+    } catch (e) {
+      debugPrint('Error adding comment: $e');
+      
+      // Roll back optimistic update
+      final currentComments = _commentsCache[postId] ?? [];
+      if (currentComments.isNotEmpty && currentComments.first.id.startsWith('temp_')) {
+        _commentsCache[postId] = currentComments.skip(1).toList();
+      }
+      
+      // Roll back comment count
+      final isReelPost = _reels.any((p) => p.id == postId);
+      if (isReelPost) {
+        final index = _reels.indexWhere((p) => p.id == postId);
+        if (index != -1) {
+          final post = _reels[index];
+          _reels[index] = PostModel(
+            id: post.id,
+            author: post.author,
+            content: post.content,
+            videoUrl: post.videoUrl,
+            imageUrl: post.imageUrl,
+            createdAt: post.createdAt,
+            likes: post.likes,
+            comments: (post.comments - 1).clamp(0, double.infinity).toInt(),
+            shares: post.shares,
+            views: post.views,
+          );
+        }
+      } else {
+        final index = _posts.indexWhere((p) => p.id == postId);
+        if (index != -1) {
+          final post = _posts[index];
+          _posts[index] = PostModel(
+            id: post.id,
+            author: post.author,
+            content: post.content,
+            videoUrl: post.videoUrl,
+            imageUrl: post.imageUrl,
+            createdAt: post.createdAt,
+            likes: post.likes,
+            comments: (post.comments - 1).clamp(0, double.infinity).toInt(),
+            shares: post.shares,
+            views: post.views,
+          );
+        }
+      }
+      
+      notifyListeners();
+      rethrow;
     }
   }
 
@@ -282,6 +650,13 @@ class PostsProvider with ChangeNotifier {
   void dispose() {
     _postsSubscription?.cancel();
     _reelsSubscription?.cancel();
+    
+    // Cancel all comment subscriptions
+    for (var subscription in _commentSubscriptions.values) {
+      subscription.cancel();
+    }
+    _commentSubscriptions.clear();
+    
     super.dispose();
   }
 }

@@ -21,6 +21,9 @@ class PostCard extends StatelessWidget {
   
   /// Optional callback for share action
   final VoidCallback? onShare;
+  
+  /// Whether the post is liked by the current user
+  final bool isLiked;
 
   const PostCard({
     super.key,
@@ -30,6 +33,7 @@ class PostCard extends StatelessWidget {
     this.onComment,
     this.onSave,
     this.onShare,
+    this.isLiked = false,
   });
 
   /// Format number for display (e.g., 160000 -> 160K, 16000 -> 16K)
@@ -202,9 +206,10 @@ class PostCard extends StatelessWidget {
       children: [
         // Like count
         _buildActionButton(
-          icon: Icons.favorite,
+          icon: isLiked ? Icons.favorite : Icons.favorite_border,
           count: formatNumber(post.likes),
           onTap: onLike,
+          isHighlighted: isLiked,
         ),
         const SizedBox(width: 20),
         // Comment count

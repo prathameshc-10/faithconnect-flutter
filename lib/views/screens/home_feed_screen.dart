@@ -77,6 +77,10 @@ class HomeFeedScreen extends StatelessWidget {
         if (appState.community != null && appState.community!.isNotEmpty) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             postsProvider.loadPosts(appState.community!);
+            // Load liked status if user is logged in
+            if (appState.userId != null) {
+              postsProvider.loadLikedStatus(appState.userId!);
+            }
           });
         }
 
@@ -173,24 +177,52 @@ class HomeFeedScreen extends StatelessWidget {
                         padding: EdgeInsets.zero,
                         itemBuilder: (context, index) {
                           final post = posts[index];
+                          final appState = context.read<AppStateProvider>();
+                          final isLiked = postsProvider.isPostLiked(post.id);
+                          
                           return PostCard(
                             post: post,
+                            isLiked: isLiked,
+                            onLike: appState.userId != null
+                                ? () async {
+                                    try {
+                                      await postsProvider.toggleLike(post, appState.userId!);
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Failed to like post. Please try again.'),
+                                            duration: Duration(seconds: 2),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  }
+                                : null,
                             onComment: () {
-                              showCommentsBottomSheet(
-                                context,
-                                comments: [], // TODO: Load comments from Firestore
-                                postTitle: '${post.author.name}\'s Post',
-                              );
+                              if (appState.userId != null) {
+                                // Fetch comments and show bottom sheet
+                                postsProvider.fetchComments(post.id, isReel: false);
+                                showCommentsBottomSheet(
+                                  context,
+                                  postId: post.id,
+                                  postTitle: '${post.author.name}\'s Post',
+                                  isReel: false,
+                                );
+                              }
                             },
                             onShare: () async {
-                              final success = await postsProvider.share(post, isReel: false);
-                              if (!success && context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Failed to share post. Please try again.'),
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
+                              try {
+                                await postsProvider.share(post);
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Failed to share post. Please try again.'),
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                }
                               }
                             },
                           );

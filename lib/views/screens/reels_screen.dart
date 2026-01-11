@@ -284,21 +284,48 @@ class _ReelsScreenState extends State<ReelsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildActionButton(
-                icon: Icons.favorite,
-                count: _formatNumber(reel.likes),
-                onTap: () {},
+              Consumer2<PostsProvider, AppStateProvider>(
+                builder: (context, postsProvider, appState, child) {
+                  final isLiked = postsProvider.isReelLiked(reel.id);
+                  return _buildActionButton(
+                    icon: isLiked ? Icons.favorite : Icons.favorite_border,
+                    count: _formatNumber(reel.likes),
+                    onTap: appState.userId != null
+                        ? () async {
+                            try {
+                              await postsProvider.toggleLike(reel, appState.userId!);
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Failed to like reel. Please try again.'),
+                                    duration: Duration(seconds: 2),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
+                          }
+                        : null,
+                    isLiked: isLiked,
+                  );
+                },
               ),
               const SizedBox(height: 24),
               _buildActionButton(
                 icon: Icons.chat_bubble_outline,
                 count: _formatNumber(reel.comments),
                 onTap: () {
-                  showCommentsBottomSheet(
-                    context,
-                    comments: [],
-                    postTitle: 'Reel Comments',
-                  );
+                  final appState = context.read<AppStateProvider>();
+                  if (appState.userId != null) {
+                    postsProvider.fetchComments(reel.id, isReel: true);
+                    showCommentsBottomSheet(
+                      context,
+                      postId: reel.id,
+                      postTitle: 'Reel Comments',
+                      isReel: true,
+                    );
+                  }
                 },
               ),
               const SizedBox(height: 24),
@@ -306,15 +333,18 @@ class _ReelsScreenState extends State<ReelsScreen> {
                 icon: Icons.share,
                 count: _formatNumber(reel.shares),
                 onTap: () async {
-                  final success = await postsProvider.share(reel, isReel: true);
-                  if (!success && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Failed to share reel. Please try again.'),
-                        duration: Duration(seconds: 2),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
+                  try {
+                    await postsProvider.share(reel);
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Failed to share reel. Please try again.'),
+                          duration: Duration(seconds: 2),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   }
                 },
               ),
@@ -366,6 +396,10 @@ class _ReelsScreenState extends State<ReelsScreen> {
         if (appState.community != null && appState.community!.isNotEmpty) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             postsProvider.loadReels(appState.community!);
+            // Load liked status if user is logged in
+            if (appState.userId != null) {
+              postsProvider.loadLikedStatus(appState.userId!);
+            }
           });
         }
 
