@@ -660,4 +660,3 @@ class PostsProvider with ChangeNotifier {
     super.dispose();
   }
 }
-

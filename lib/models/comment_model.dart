@@ -14,7 +14,7 @@ class CommentModel {
     required this.userId,
     required this.text,
     required this.createdAt,
-    this.author,
+    this.author, 
   });
 
   /// Create CommentModel from Firestore document
