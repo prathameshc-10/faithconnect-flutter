@@ -591,7 +591,6 @@ class FirestoreService {
         });
 
         // Increment likes count
-        final currentLikes = (postDoc.data()?['likes'] as int?) ?? 0;
         transaction.update(postRef, {
           'likes': firestore.FieldValue.increment(1),
         });
@@ -666,7 +665,8 @@ class FirestoreService {
         transaction.delete(likeRef);
 
         // Decrement likes count (prevent negative)
-        final currentLikes = (postDoc.data()?['likes'] as int?) ?? 0;
+        final postData = postDoc.data() as Map<String, dynamic>?;
+        final currentLikes = (postData?['likes'] as int?) ?? 0;
         if (currentLikes > 0) {
           transaction.update(postRef, {
             'likes': firestore.FieldValue.increment(-1),
@@ -705,7 +705,8 @@ class FirestoreService {
         transaction.delete(likeRef);
 
         // Decrement likes count (prevent negative)
-        final currentLikes = (reelDoc.data()?['likes'] as int?) ?? 0;
+        final reelData = reelDoc.data() as Map<String, dynamic>?;
+        final currentLikes = (reelData?['likes'] as int?) ?? 0;
         if (currentLikes > 0) {
           transaction.update(reelRef, {
             'likes': firestore.FieldValue.increment(-1),
