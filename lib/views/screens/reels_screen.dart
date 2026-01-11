@@ -312,41 +312,47 @@ class _ReelsScreenState extends State<ReelsScreen> {
                 },
               ),
               const SizedBox(height: 24),
-              _buildActionButton(
-                icon: Icons.chat_bubble_outline,
-                count: _formatNumber(reel.comments),
-                onTap: () {
-                  final appState = context.read<AppStateProvider>();
-                  if (appState.userId != null) {
-                    postsProvider.fetchComments(reel.id, isReel: true);
-                    showCommentsBottomSheet(
-                      context,
-                      postId: reel.id,
-                      postTitle: 'Reel Comments',
-                      isReel: true,
-                    );
-                  }
-                },
-              ),
-              const SizedBox(height: 24),
-              _buildActionButton(
-                icon: Icons.share,
-                count: _formatNumber(reel.shares),
-                onTap: () async {
-                  try {
-                    await postsProvider.share(reel);
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Failed to share reel. Please try again.'),
-                          duration: Duration(seconds: 2),
-                          backgroundColor: Colors.red,
-                        ),
+              Builder(
+                builder: (context) => _buildActionButton(
+                  icon: Icons.chat_bubble_outline,
+                  count: _formatNumber(reel.comments),
+                  onTap: () {
+                    final appState = context.read<AppStateProvider>();
+                    final postsProvider = context.read<PostsProvider>();
+                    if (appState.userId != null) {
+                      postsProvider.fetchComments(reel.id, isReel: true);
+                      showCommentsBottomSheet(
+                        context,
+                        postId: reel.id,
+                        postTitle: 'Reel Comments',
+                        isReel: true,
                       );
                     }
-                  }
-                },
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
+              Builder(
+                builder: (context) => _buildActionButton(
+                  icon: Icons.share,
+                  count: _formatNumber(reel.shares),
+                  onTap: () async {
+                    final postsProvider = context.read<PostsProvider>();
+                    try {
+                      await postsProvider.share(reel);
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Failed to share reel. Please try again.'),
+                            duration: Duration(seconds: 2),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                ),
               ),
             ],
           ),
@@ -358,7 +364,8 @@ class _ReelsScreenState extends State<ReelsScreen> {
   Widget _buildActionButton({
     required IconData icon,
     required String count,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
+    bool isLiked = false,
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -376,7 +383,11 @@ class _ReelsScreenState extends State<ReelsScreen> {
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
               ),
-              child: Icon(icon, color: Colors.white, size: 24),
+              child: Icon(
+                icon,
+                color: isLiked ? Colors.red : Colors.white,
+                size: 24,
+              ),
             ),
           ),
         ),

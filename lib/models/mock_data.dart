@@ -184,6 +184,10 @@ class MockData {
     return [
       CommentModel(
         id: '1',
+        userId: '5',
+        text:
+            'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+        createdAt: now.subtract(const Duration(hours: 13)),
         author: UserModel(
           id: '5',
           name: 'Willard Gleichner',
@@ -191,13 +195,13 @@ class MockData {
           profileImageUrl: '',
           isVerified: false,
         ),
-        text:
-            'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
-        createdAt: now.subtract(const Duration(hours: 13)),
-        likes: 600,
       ),
       CommentModel(
         id: '2',
+        userId: '6',
+        text:
+            'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+        createdAt: now.subtract(const Duration(days: 1)),
         author: UserModel(
           id: '6',
           name: 'Kristie Stiedemann',
@@ -205,20 +209,19 @@ class MockData {
           profileImageUrl: '',
           isVerified: false,
         ),
-        text:
-            'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
-        createdAt: now.subtract(const Duration(days: 1)),
-        likes: 368,
       ),
       CommentModel(
         id: '3',
-        author: users[0],
+        userId: users[0].id,
         text: 'Thank you for sharing this wonderful message. It really touched my heart.',
         createdAt: now.subtract(const Duration(hours: 3)),
-        likes: 120,
+        author: users[0],
       ),
       CommentModel(
         id: '4',
+        userId: '7',
+        text: 'Great post! Looking forward to more content like this.',
+        createdAt: now.subtract(const Duration(hours: 5)),
         author: UserModel(
           id: '7',
           name: 'John Smith',
@@ -226,16 +229,13 @@ class MockData {
           profileImageUrl: '',
           isVerified: false,
         ),
-        text: 'Great post! Looking forward to more content like this.',
-        createdAt: now.subtract(const Duration(hours: 5)),
-        likes: 89,
       ),
       CommentModel(
         id: '5',
-        author: users[2],
+        userId: users[2].id,
         text: 'This is exactly what I needed to hear today. Thank you for your wisdom.',
         createdAt: now.subtract(const Duration(hours: 8)),
-        likes: 234,
+        author: users[2],
       ),
     ];
   }
