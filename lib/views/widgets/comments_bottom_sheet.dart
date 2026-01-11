@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../models/comment_model.dart';
+import '../../providers/posts_provider.dart';
+import '../../providers/app_state_provider.dart';
 import 'comment_item.dart';
 
 /// CommentsBottomSheet Widget
@@ -7,13 +10,15 @@ import 'comment_item.dart';
 /// - Scrollable list of comments
 /// - Fixed input field at bottom with send icon
 class CommentsBottomSheet extends StatefulWidget {
-  final List<CommentModel> comments;
+  final String postId;
   final String postTitle;
+  final bool isReel;
 
   const CommentsBottomSheet({
     super.key,
-    required this.comments,
+    required this.postId,
     this.postTitle = 'Comments',
+    this.isReel = false,
   });
 
   @override
@@ -23,12 +28,73 @@ class CommentsBottomSheet extends StatefulWidget {
 class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
   final TextEditingController _commentController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch comments when bottom sheet opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final postsProvider = context.read<PostsProvider>();
+      postsProvider.fetchComments(widget.postId, isReel: widget.isReel);
+    });
+  }
 
   @override
   void dispose() {
     _commentController.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleSend() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty || _isSubmitting) return;
+
+    final postsProvider = context.read<PostsProvider>();
+    final appState = context.read<AppStateProvider>();
+
+    if (appState.userId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You must be logged in to comment'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await postsProvider.addComment(
+        postId: widget.postId,
+        userId: appState.userId!,
+        text: text,
+        isReel: widget.isReel,
+      );
+      _commentController.clear();
+      _focusNode.unfocus();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to add comment. Please try again.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
   }
 
   /// Build the input field at the bottom
@@ -78,33 +144,36 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
                 ),
                 maxLines: null,
                 textInputAction: TextInputAction.send,
-                onSubmitted: (_) {
-                  // Handle send action (no logic required per requirements)
-                  _commentController.clear();
-                },
+                onSubmitted: (_) => _handleSend(),
+                enabled: !_isSubmitting,
               ),
             ),
             const SizedBox(width: 8),
             // Send icon button
             Material(
-              color: Colors.blue,
+              color: _isSubmitting ? Colors.grey : Colors.blue,
               borderRadius: BorderRadius.circular(24),
               child: InkWell(
-                onTap: () {
-                  // Handle send action (no logic required per requirements)
-                  _commentController.clear();
-                  _focusNode.unfocus();
-                },
+                onTap: _isSubmitting ? null : _handleSend,
                 borderRadius: BorderRadius.circular(24),
                 child: Container(
                   width: 48,
                   height: 48,
                   alignment: Alignment.center,
-                  child: const Icon(
-                    Icons.send,
-                    color: Colors.white,
-                    size: 20,
-                  ),
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.send,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                 ),
               ),
             ),
@@ -162,8 +231,19 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
           const Divider(height: 1),
           // Scrollable comments list
           Expanded(
-            child: widget.comments.isEmpty
-                ? Center(
+            child: Consumer<PostsProvider>(
+              builder: (context, postsProvider, child) {
+                final comments = postsProvider.getComments(widget.postId);
+                final isLoading = postsProvider.isLoadingComments(widget.postId);
+
+                if (isLoading) {
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
+                }
+
+                if (comments.isEmpty) {
+                  return Center(
                     child: Text(
                       'No comments yet',
                       style: TextStyle(
@@ -171,14 +251,23 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
                         fontSize: 14,
                       ),
                     ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: widget.comments.length,
-                    itemBuilder: (context, index) {
-                      return CommentItem(comment: widget.comments[index]);
-                    },
-                  ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: comments.length,
+                  itemBuilder: (context, index) {
+                    final comment = comments[index];
+                    // Only show if author is loaded
+                    if (comment.author == null) {
+                      return const SizedBox.shrink();
+                    }
+                    return CommentItem(comment: comment);
+                  },
+                );
+              },
+            ),
           ),
           // Fixed input field at bottom
           _buildInputField(),
@@ -192,16 +281,18 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
 /// This can be called from anywhere to display the comments modal
 void showCommentsBottomSheet(
   BuildContext context, {
-  required List<CommentModel> comments,
+  required String postId,
   String postTitle = 'Comments',
+  bool isReel = false,
 }) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (context) => CommentsBottomSheet(
-      comments: comments,
+      postId: postId,
       postTitle: postTitle,
+      isReel: isReel,
     ),
   );
 }

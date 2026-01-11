@@ -37,13 +37,13 @@ class CommentItem extends StatelessWidget {
           CircleAvatar(
             radius: 18,
             backgroundColor: Colors.grey[300],
-            backgroundImage: comment.author.profileImageUrl.isNotEmpty
-                ? NetworkImage(comment.author.profileImageUrl)
+            backgroundImage: comment.author?.profileImageUrl.isNotEmpty == true
+                ? NetworkImage(comment.author!.profileImageUrl)
                 : null,
-            child: comment.author.profileImageUrl.isEmpty
+            child: comment.author?.profileImageUrl.isEmpty != false
                 ? Icon(
                     Icons.person,
-                    color: comment.author.isVerified ? Colors.blue : Colors.grey[600],
+                    color: comment.author?.isVerified == true ? Colors.blue : Colors.grey[600],
                     size: 18,
                   )
                 : null,
@@ -59,7 +59,7 @@ class CommentItem extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        comment.author.name,
+                        comment.author?.name ?? 'Unknown',
                         style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
@@ -68,7 +68,7 @@ class CommentItem extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if (comment.author.isVerified) ...[
+                    if (comment.author?.isVerified == true) ...[
                       const SizedBox(width: 4),
                       const Icon(
                         Icons.verified,
@@ -96,27 +96,6 @@ class CommentItem extends StatelessWidget {
                     color: Colors.black87,
                   ),
                 ),
-                if (comment.likes > 0) ...[
-                  const SizedBox(height: 8),
-                  // Like count (optional)
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.favorite,
-                        size: 14,
-                        color: Colors.grey[600],
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${comment.likes}',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
               ],
             ),
           ),
