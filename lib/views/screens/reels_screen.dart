@@ -79,7 +79,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
   }
 
   /// Build a single reel item with video player
-  Widget _buildReelItem(PostModel reel, int index, double bottomNavHeight, PostsProvider postsProvider, BuildContext context) {
+  Widget _buildReelItem(PostModel reel, int index, double bottomNavHeight, BuildContext context) {
     final videoController = _videoControllers[index];
     final hasVideo = reel.videoUrl != null && reel.videoUrl!.isNotEmpty;
 
@@ -465,7 +465,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
               itemCount: reels.length,
               onPageChanged: _onPageChanged,
               itemBuilder: (context, index) {
-                return _buildReelItem(reels[index], index, bottomNavHeight, postsProvider, context);
+                return _buildReelItem(reels[index], index, bottomNavHeight, context);
               },
             ),
           ),
