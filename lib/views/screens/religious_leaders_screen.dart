@@ -148,13 +148,13 @@ class ReligiousLeadersScreen extends StatelessWidget {
     return Consumer2<LeadersProvider, AppStateProvider>(
       builder: (context, provider, appState, child) {
         // Load leaders when screen is built and community is available
-        if (appState.community != null && provider.allLeaders.isEmpty && !provider.isLoading) {
+        if (appState.community != null && appState.community!.isNotEmpty) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            provider.loadLeaders(appState.community!);
+            provider.loadLeaders(appState.community!, appState.userId);
           });
         }
 
-        // Get leaders from provider (filtered by community from Firestore)
+        // Get leaders from provider (filtered by tab: My Leaders or Explore)
         final allLeaders = provider.allLeaders;
         
         // Filter based on search query
@@ -222,6 +222,7 @@ class ReligiousLeadersScreen extends StatelessWidget {
                         itemCount: filteredLeaders.length,
                         itemBuilder: (context, index) {
                           final leader = filteredLeaders[index];
+                          // Show message button if in My Leaders tab (already followed)
                           final isMyLeaders = provider.isMyLeadersSelected;
                           return LeaderCard(
                             leader: leader,
@@ -238,17 +239,7 @@ class ReligiousLeadersScreen extends StatelessWidget {
                               );
                             },
                             onAction: () {
-                              // Handle action (no logic required)
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    isMyLeaders
-                                        ? 'Message ${leader.name}'
-                                        : 'Follow ${leader.name}',
-                                  ),
-                                  duration: const Duration(seconds: 1),
-                                ),
-                              );
+                              // Action handled internally in LeaderCard (follow/message)
                             },
                           );
                         },

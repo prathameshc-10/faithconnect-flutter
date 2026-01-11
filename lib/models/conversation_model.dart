@@ -6,6 +6,7 @@ class Conversation {
   final DateTime timestamp;
   final bool isUnread;
   final int unreadCount;
+  final List<String>? participants; // IDs of participants
 
   Conversation({
     required this.id,
@@ -15,6 +16,7 @@ class Conversation {
     required this.timestamp,
     this.isUnread = false,
     this.unreadCount = 0,
+    this.participants,
   });
 
   Conversation copyWith({
@@ -25,6 +27,7 @@ class Conversation {
     DateTime? timestamp,
     bool? isUnread,
     int? unreadCount,
+    List<String>? participants,
   }) {
     return Conversation(
       id: id ?? this.id,
@@ -34,6 +37,7 @@ class Conversation {
       timestamp: timestamp ?? this.timestamp,
       isUnread: isUnread ?? this.isUnread,
       unreadCount: unreadCount ?? this.unreadCount,
+      participants: participants ?? this.participants,
     );
   }
 }

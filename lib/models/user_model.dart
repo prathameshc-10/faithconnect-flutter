@@ -19,4 +19,26 @@ class UserModel {
     this.community,
     this.role,
   });
+
+  UserModel copyWith({
+    String? id,
+    String? name,
+    String? username,
+    String? profileImageUrl,
+    bool? isVerified,
+    String? description,
+    String? community,
+    String? role,
+  }) {
+    return UserModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      username: username ?? this.username,
+      profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      isVerified: isVerified ?? this.isVerified,
+      description: description ?? this.description,
+      community: community ?? this.community,
+      role: role ?? this.role,
+    );
+  }
 }

@@ -1,3 +1,4 @@
+import 'package:faith_connect/models/post_model.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/feed_provider.dart';
@@ -79,8 +80,15 @@ class HomeFeedScreen extends StatelessWidget {
           });
         }
 
-        final posts = postsProvider.posts;
-        final isLoading = postsProvider.isLoading;
+        // Filter posts based on selected tab
+        List<PostModel> posts = postsProvider.posts;
+        if (feedProvider.isFollowingSelected && appState.userId != null) {
+          // For Following tab, we could filter by followed leaders
+          // For now, show all posts from community (following filter can be added later)
+        }
+
+        // Show loading only if we're loading AND have no posts yet
+        final isLoading = postsProvider.isLoading && posts.isEmpty;
 
         return Scaffold(
           backgroundColor: Colors.white,

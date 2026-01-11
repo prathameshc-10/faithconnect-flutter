@@ -2,7 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'providers/navigation_provider.dart';
+// ❌ REMOVED: import 'providers/navigation_provider.dart';
 import 'providers/feed_provider.dart';
 import 'providers/leaders_provider.dart';
 import 'providers/messages_provider.dart';
@@ -54,17 +54,23 @@ class FaithConnectApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        // Navigation state provider (bottom navigation bar)
-        ChangeNotifierProvider(create: (_) => NavigationProvider()),
-        // Global app state provider (auth + role)
-        ChangeNotifierProvider(create: (_) => AppStateProvider()),
-        // Content/posts provider (shared between worshipers and leaders)
+        // ❌ REMOVED: NavigationProvider (each navigation shell creates its own)
+        
+        // ✅ Global app state provider (auth + role)
+        ChangeNotifierProvider(
+          create: (_) => AppStateProvider(),
+        ),
+        
+        // ✅ Content/posts provider (shared between worshipers and leaders)
         ChangeNotifierProvider(create: (_) => PostsProvider()),
-        // Feed state provider (Explore/Following tabs)
+        
+        // ✅ Feed state provider (Explore/Following tabs)
         ChangeNotifierProvider(create: (_) => FeedProvider()),
-        // Leaders state provider (My Leaders/Explore tabs)
+        
+        // ✅ Leaders state provider (My Leaders/Explore tabs)
         ChangeNotifierProvider(create: (_) => LeadersProvider()),
-        // Messages state provider (mocked, UI-only)
+        
+        // ✅ Messages state provider (mocked, UI-only)
         ChangeNotifierProvider(create: (_) => MessagesProvider()),
       ],
       child: MaterialApp(
@@ -93,7 +99,7 @@ class FaithConnectApp extends StatelessWidget {
             brightness: Brightness.light,
           ),
         ),
-        // Main entry point: Splash screen which routes into auth/role flows
+        // ✅ Main entry point: Splash screen which routes to AuthGate
         home: const SplashScreen(),
       ),
     );

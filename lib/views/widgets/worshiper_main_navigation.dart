@@ -8,19 +8,34 @@ import '../screens/messages_screen.dart';
 import '../screens/worshiper_profile_screen.dart';
 import 'animated_bottom_nav_bar.dart';
 
-/// Main Navigation Widget
+/// Worshiper Main Navigation Widget
 ///
-/// - Provides a floating, animated bottom navigation bar.
-/// - Uses [NavigationProvider] for tab state.
-/// - Uses [UserRoleProvider] for role-based behavior on the 4th tab.
-class MainNavigation extends StatelessWidget {
-  const MainNavigation({super.key});
+/// Provides a floating, animated bottom navigation bar with 5 tabs.
+/// This is the navigation shell for worshipers only.
+/// Leaders use LeaderMainNavigation instead.
+class WorshiperMainNavigation extends StatelessWidget {
+  const WorshiperMainNavigation({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // ✅ Create a LOCAL NavigationProvider for this navigation shell
+    // This is separate from the leader's NavigationProvider
+    return ChangeNotifierProvider(
+      create: (_) => NavigationProvider(),
+      child: const _WorshiperMainNavigationScaffold(),
+    );
+  }
+}
+
+/// Internal scaffold widget that builds the actual navigation UI
+class _WorshiperMainNavigationScaffold extends StatelessWidget {
+  const _WorshiperMainNavigationScaffold({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final navigationProvider = context.watch<NavigationProvider>();
 
-    // Worshiper navigation only (leaders use LeaderMainNavigation).
+    // Worshiper navigation with 5 tabs
     // Tabs: Home | Religious Leaders | Reels | Messages | Profile
     final screens = <Widget>[
       const HomeFeedScreen(),

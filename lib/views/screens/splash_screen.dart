@@ -1,12 +1,9 @@
 import 'dart:async';
+import 'package:faith_connect/views/screens/auth_gate.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_state_provider.dart';
-import '../../providers/user_role_provider.dart';
-import '../widgets/main_navigation.dart';
-import 'sign_in_screen.dart';
-import 'leader_profile_setup_screen.dart';
-import '../widgets/leader_main_navigation.dart';
+
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -42,51 +39,23 @@ class _SplashScreenState extends State<SplashScreen>
     _initializeAndNavigate();
   }
 
-  Future<void> _initializeAndNavigate() async {
-    // Initialize app state (check if user is already signed in)
-    final appState = context.read<AppStateProvider>();
-    await appState.initialize();
+Future<void> _initializeAndNavigate() async {
+  // Initialize app state (check if user is already signed in)
+  final appState = context.read<AppStateProvider>();
+  await appState.initialize();
 
-    // Wait for splash animation
-    await Future.delayed(const Duration(seconds: 2));
+  // Wait for splash animation
+  await Future.delayed(const Duration(seconds: 2));
 
-    if (!mounted) return;
+  if (!mounted) return;
 
-    _handleNavigation();
-  }
-
-  void _handleNavigation() {
-    final appState = context.read<AppStateProvider>();
-    if (!mounted) return;
-
-    if (!appState.isAuthenticated) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const SignInScreen()),
-      );
-      return;
-    }
-
-    final userRole = appState.userRole;
-    if (userRole == UserRole.worshiper) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainNavigation()),
-      );
-    } else {
-      if (!appState.isLeaderProfileComplete) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const LeaderProfileSetupScreen()),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const LeaderMainNavigation()),
-        );
-      }
-    }
-  }
+  // ✅ Just navigate to AuthGate - it handles everything
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (_) => const AuthGate()),
+  );
+}
+  
 
   @override
   void dispose() {

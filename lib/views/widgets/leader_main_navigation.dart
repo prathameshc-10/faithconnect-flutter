@@ -18,14 +18,31 @@ import 'animated_bottom_nav_bar.dart';
 /// 1: Create
 /// 2: Messages
 /// 3: Profile
-class LeaderMainNavigation extends StatefulWidget {
+class LeaderMainNavigation extends StatelessWidget {
   const LeaderMainNavigation({super.key});
 
   @override
-  State<LeaderMainNavigation> createState() => _LeaderMainNavigationState();
+  Widget build(BuildContext context) {
+    // ✅ Create a LOCAL NavigationProvider for leader navigation
+    // This is separate from the worshiper's NavigationProvider
+    return ChangeNotifierProvider(
+      create: (_) => NavigationProvider(),
+      child: const _LeaderMainNavigationScaffold(),
+    );
+  }
 }
 
-class _LeaderMainNavigationState extends State<LeaderMainNavigation> {
+/// Internal scaffold widget that builds the actual navigation UI
+class _LeaderMainNavigationScaffold extends StatefulWidget {
+  const _LeaderMainNavigationScaffold({Key? key}) : super(key: key);
+
+  @override
+  State<_LeaderMainNavigationScaffold> createState() =>
+      _LeaderMainNavigationScaffoldState();
+}
+
+class _LeaderMainNavigationScaffoldState
+    extends State<_LeaderMainNavigationScaffold> {
   final FirestoreService _firestoreService = FirestoreService();
   UserModel? _currentLeader;
 
@@ -40,13 +57,15 @@ class _LeaderMainNavigationState extends State<LeaderMainNavigation> {
     if (appState.userId == null) return;
 
     try {
-      final leaderData = await _firestoreService.getLeaderData(appState.userId!);
+      final leaderData =
+          await _firestoreService.getLeaderData(appState.userId!);
       if (leaderData != null && mounted) {
         setState(() {
           _currentLeader = UserModel(
             id: appState.userId!,
             name: leaderData['name'] as String? ?? 'Leader',
-            username: '@${(leaderData['name'] as String? ?? 'leader').toLowerCase().replaceAll(' ', '_')}',
+            username:
+                '@${(leaderData['name'] as String? ?? 'leader').toLowerCase().replaceAll(' ', '_')}',
             profileImageUrl: leaderData['profileImageUrl'] as String? ?? '',
             isVerified: false,
             description: leaderData['bio'] as String?,
@@ -66,16 +85,17 @@ class _LeaderMainNavigationState extends State<LeaderMainNavigation> {
     final appState = context.watch<AppStateProvider>();
 
     // Create a placeholder leader model from current user data
-    final leader = _currentLeader ?? UserModel(
-      id: appState.userId ?? '',
-      name: 'Loading...',
-      username: '@loading',
-      profileImageUrl: '',
-      isVerified: false,
-    );
+    final leader = _currentLeader ??
+        UserModel(
+          id: appState.userId ?? '',
+          name: 'Loading...',
+          username: '@loading',
+          profileImageUrl: '',
+          isVerified: false,
+        );
 
     final screens = <Widget>[
-      LeaderDashboardScreen(leader: leader,),
+      LeaderDashboardScreen(leader: leader),
       const CreateContentScreen(),
       const MessagesScreen(),
       LeaderProfileScreen(leader: leader),
@@ -105,4 +125,3 @@ class _LeaderMainNavigationState extends State<LeaderMainNavigation> {
     );
   }
 }
-

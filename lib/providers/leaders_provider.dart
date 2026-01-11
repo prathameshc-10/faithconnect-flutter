@@ -12,7 +12,10 @@ class LeadersProvider with ChangeNotifier {
   String _selectedSortBy = 'Trending'; // Trending, Near you, New
   String _searchQuery = '';
   List<UserModel> _allLeaders = [];
+  List<String> _followedLeaderIds = [];
   bool _isLoading = false;
+  String? _currentCommunity;
+  String? _currentUserId;
 
   /// Current selected tab (0: My Leaders, 1: Explore)
   int get selectedTab => _selectedTab;
@@ -29,44 +32,92 @@ class LeadersProvider with ChangeNotifier {
   /// Current search query
   String get searchQuery => _searchQuery;
 
-  /// All leaders from Firestore
-  List<UserModel> get allLeaders => List.unmodifiable(_allLeaders);
+  /// All leaders from Firestore (filtered by tab)
+  List<UserModel> get allLeaders {
+    if (isMyLeadersSelected) {
+      // Return only followed leaders
+      return _allLeaders.where((leader) => _followedLeaderIds.contains(leader.id)).toList();
+    } else {
+      // Return all leaders in community
+      return List.unmodifiable(_allLeaders);
+    }
+  }
 
   /// Loading state
   bool get isLoading => _isLoading;
 
   /// Load leaders from Firestore filtered by community
-  Future<void> loadLeaders(String community) async {
+  Future<void> loadLeaders(String community, String? userId) async {
     if (community.isEmpty) return;
+    if (_currentCommunity == community && _currentUserId == userId && _allLeaders.isNotEmpty) {
+      // Already loaded, just update followed list if userId changed
+      if (userId != null && userId != _currentUserId) {
+        await _loadFollowedLeaders(userId);
+      }
+      return;
+    }
 
+    _currentCommunity = community;
+    _currentUserId = userId;
     _isLoading = true;
+    _allLeaders = [];
     notifyListeners();
 
+    // Load followed leaders if user is a worshiper
+    if (userId != null) {
+      await _loadFollowedLeaders(userId);
+    }
+
     try {
-      // Get leaders stream and convert to list
-      final stream = _firestoreService.getLeadersByCommunity(community);
-      await for (final leadersData in stream) {
-        _allLeaders = leadersData.map((data) {
-          return UserModel(
-            id: data['id'] as String? ?? data['uid'] as String? ?? '',
-            name: data['name'] as String? ?? '',
-            username: '@${(data['name'] as String? ?? '').toLowerCase().replaceAll(' ', '_')}',
-            profileImageUrl: data['profileImageUrl'] as String? ?? '',
-            isVerified: false, // Can be added to Firestore later
-            description: data['bio'] as String?,
-            community: data['community'] as String?,
-            role: data['role'] as String?,
-          );
-        }).toList();
-        _isLoading = false;
-        notifyListeners();
-        break; // Get first snapshot and break
-      }
+      // Listen to leaders stream
+      _firestoreService.getLeadersByCommunity(community).listen(
+        (leadersData) {
+          _allLeaders = leadersData.map((data) {
+            return UserModel(
+              id: data['id'] as String? ?? data['uid'] as String? ?? '',
+              name: data['name'] as String? ?? '',
+              username: '@${(data['name'] as String? ?? '').toLowerCase().replaceAll(' ', '_')}',
+              profileImageUrl: data['profileImageUrl'] as String? ?? '',
+              isVerified: false,
+              description: data['bio'] as String?,
+              community: data['community'] as String?,
+              role: data['role'] as String?,
+            );
+          }).toList();
+          _isLoading = false;
+          notifyListeners();
+        },
+        onError: (error) {
+          debugPrint('Error loading leaders: $error');
+          _isLoading = false;
+          _allLeaders = [];
+          notifyListeners();
+        },
+      );
     } catch (e) {
       debugPrint('Error loading leaders: $e');
       _isLoading = false;
+      _allLeaders = [];
       notifyListeners();
     }
+  }
+
+  Future<void> _loadFollowedLeaders(String userId) async {
+    try {
+      _followedLeaderIds = await _firestoreService.getFollowedLeaders(userId);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading followed leaders: $e');
+    }
+  }
+
+  /// Refresh leaders list
+  Future<void> refresh(String community, String? userId) async {
+    _allLeaders = [];
+    _followedLeaderIds = [];
+    _currentCommunity = null;
+    _currentUserId = null;
+    await loadLeaders(community, userId);
   }
 
   /// Update the selected tab

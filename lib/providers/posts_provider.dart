@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
 import 'package:flutter/foundation.dart';
 import '../models/post_model.dart';
@@ -18,6 +19,9 @@ class PostsProvider with ChangeNotifier {
   
   bool _isLoading = false;
   String? _community;
+  
+  StreamSubscription? _postsSubscription;
+  StreamSubscription? _reelsSubscription;
 
   List<PostModel> get posts => List.unmodifiable(_posts);
   List<PostModel> get reels => List.unmodifiable(_reels);
@@ -25,37 +29,52 @@ class PostsProvider with ChangeNotifier {
 
   /// Load posts from Firestore filtered by community
   Future<void> loadPosts(String community) async {
-    if (_community == community && _posts.isNotEmpty) return;
+    if (community.isEmpty) return;
     
-    _community = community;
-    _isLoading = true;
-    notifyListeners();
+    // Cancel previous subscription
+    await _postsSubscription?.cancel();
+    
+    // Only set loading if we're switching communities or first load
+    if (_community != community || _posts.isEmpty) {
+      _community = community;
+      _isLoading = true;
+      _posts = [];
+      notifyListeners();
+    }
 
     try {
       // Listen to posts stream
-      _firestoreService.getPostsByCommunity(community).listen(
+      _postsSubscription = _firestoreService.getPostsByCommunity(community).listen(
         (postsData) async {
           _posts = await _convertPostsData(postsData);
+          _isLoading = false;
           notifyListeners();
         },
         onError: (error) {
           debugPrint('Error loading posts: $error');
           _isLoading = false;
+          _posts = [];
           notifyListeners();
         },
       );
     } catch (e) {
       debugPrint('Error loading posts: $e');
       _isLoading = false;
+      _posts = [];
       notifyListeners();
     }
   }
 
   /// Load reels from Firestore filtered by community
   Future<void> loadReels(String community) async {
+    if (community.isEmpty) return;
+
+    // Cancel previous subscription
+    await _reelsSubscription?.cancel();
+
     try {
       // Listen to reels stream
-      _firestoreService.getReelsByCommunity(community).listen(
+      _reelsSubscription = _firestoreService.getReelsByCommunity(community).listen(
         (reelsData) async {
           _reels = await _convertReelsData(reelsData);
           notifyListeners();
@@ -173,11 +192,21 @@ class PostsProvider with ChangeNotifier {
 
   /// Refresh posts and reels
   Future<void> refresh(String community) async {
+    await _postsSubscription?.cancel();
+    await _reelsSubscription?.cancel();
     _posts = [];
     _reels = [];
     _authorsCache = {};
+    _community = null;
     await loadPosts(community);
     await loadReels(community);
+  }
+
+  @override
+  void dispose() {
+    _postsSubscription?.cancel();
+    _reelsSubscription?.cancel();
+    super.dispose();
   }
 }
 

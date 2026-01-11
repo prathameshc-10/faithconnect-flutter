@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_state_provider.dart';
 import '../../providers/user_role_provider.dart';
-import '../widgets/main_navigation.dart';
+import '../widgets/worshiper_main_navigation.dart';
 import 'sign_up_screen.dart';
 import 'leader_profile_setup_screen.dart';
 
@@ -37,38 +37,22 @@ class _SignInScreenState extends State<SignInScreen> {
 
     try {
       final appState = context.read<AppStateProvider>();
+
+      // ✅ ONLY do this - NO navigation, NO delays
       await appState.signIn(
-        email: _emailController.text,
-        password: _passwordController.text,
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
       );
 
-      if (!mounted) return;
-
-      final userRole = appState.userRole;
-      if (userRole == UserRole.worshiper) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainNavigation()),
-        );
-      } else {
-        if (appState.isLeaderProfileComplete) {
-          // Navigate to leader dashboard if profile is complete
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const MainNavigation()),
-          );
-        } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const LeaderProfileSetupScreen()),
-          );
-        }
-      }
+      // ✅ AuthGate will automatically handle routing
+      // No Navigator.pushReplacement needed!
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -100,8 +84,7 @@ class _SignInScreenState extends State<SignInScreen> {
               Text(
                 'Welcome back to FaithConnect.',
                 style: TextStyle(
-                  color:
-                      isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                 ),
               ),
 
@@ -174,12 +157,19 @@ class _SignInScreenState extends State<SignInScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                      Icon(
+                        Icons.error_outline,
+                        color: Colors.red[700],
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: TextStyle(color: Colors.red[700], fontSize: 14),
+                          style: TextStyle(
+                            color: Colors.red[700],
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ],
@@ -203,22 +193,25 @@ class _SignInScreenState extends State<SignInScreen> {
                     ),
                     elevation: 4,
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  child:
+                      _isLoading
+                          ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                          : const Text(
+                            'Sign In',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        )
-                      : const Text(
-                          'Sign In',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
                 ),
               ),
 
@@ -231,18 +224,15 @@ class _SignInScreenState extends State<SignInScreen> {
                   Text(
                     "Don’t have an account?",
                     style: TextStyle(
-                      color: isDark
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade600,
+                      color:
+                          isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                     ),
                   ),
                   TextButton(
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => const SignUpScreen(),
-                        ),
+                        MaterialPageRoute(builder: (_) => const SignUpScreen()),
                       );
                     },
                     child: const Text(
@@ -290,8 +280,7 @@ class _InputLabel extends StatelessWidget {
           fontSize: 11,
           letterSpacing: 1.2,
           fontWeight: FontWeight.w600,
-          color:
-              isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
         ),
       ),
     );
@@ -325,20 +314,17 @@ class _InputField extends StatelessWidget {
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
-        fillColor:
-            isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF9FAFB),
+        fillColor: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF9FAFB),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(
-            color:
-                isDark ? Colors.grey.shade800 : Colors.grey.shade300,
+            color: isDark ? Colors.grey.shade800 : Colors.grey.shade300,
           ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(
-            color:
-                isDark ? Colors.grey.shade800 : Colors.grey.shade300,
+            color: isDark ? Colors.grey.shade800 : Colors.grey.shade300,
           ),
         ),
       ),
@@ -370,16 +356,18 @@ class _RoleCard extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 20),
           decoration: BoxDecoration(
-            color: selected
-                ? Colors.black
-                : isDark
+            color:
+                selected
+                    ? Colors.black
+                    : isDark
                     ? const Color(0xFF1C1C1E)
                     : const Color(0xFFF9FAFB),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: selected
-                  ? Colors.black
-                  : isDark
+              color:
+                  selected
+                      ? Colors.black
+                      : isDark
                       ? Colors.grey.shade800
                       : Colors.grey.shade200,
               width: 2,
@@ -387,10 +375,7 @@ class _RoleCard extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Icon(
-                icon,
-                color: selected ? Colors.white : Colors.grey,
-              ),
+              Icon(icon, color: selected ? Colors.white : Colors.grey),
               const SizedBox(height: 8),
               Text(
                 label,
@@ -419,8 +404,7 @@ class _SocialButton extends StatelessWidget {
       width: 44,
       height: 44,
       decoration: BoxDecoration(
-        color:
-            isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+        color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
         shape: BoxShape.circle,
       ),
       child: Icon(icon),

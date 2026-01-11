@@ -1,57 +1,126 @@
+import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../models/message_model.dart';
+import '../../providers/app_state_provider.dart';
+import '../../services/firestore_service.dart';
 import '../widgets/chat_bubble.dart';
 
 class ChatScreen extends StatefulWidget {
+  final String conversationId;
   final String title;
-  final bool isOnline;
+  final String? receiverId;
 
-  const ChatScreen({super.key, this.title = 'Leader', this.isOnline = true});
+  const ChatScreen({
+    super.key,
+    required this.conversationId,
+    this.title = 'Leader',
+    this.receiverId,
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final List<Message> _messages = [];
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final FirestoreService _firestoreService = FirestoreService();
+  List<Message> _messages = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadMockMessages();
+    _loadMessages();
   }
 
-  void _loadMockMessages() {
-    final now = DateTime.now();
-    _messages.addAll([
-      Message(id: 'm1', text: 'Hello! How are you?', timestamp: DateTime(now.year, now.month, now.day, 8, 20), isSent: false),
-      Message(id: 'm2', text: 'I am well, thank you. The sermon was uplifting.', timestamp: DateTime(now.year, now.month, now.day, 8, 25), isSent: true),
-      Message(id: 'm3', text: 'Praise God! 🙌', timestamp: DateTime(now.year, now.month, now.day, 9, 16), isSent: false),
-      Message(id: 'm4', text: 'Are you joining the prayer meeting tomorrow?', timestamp: DateTime(now.year, now.month, now.day, 9, 30), isSent: true),
-      Message(id: 'm5', text: 'Yes, I will be there.', timestamp: DateTime(now.year, now.month, now.day, 9, 34), isSent: false),
-    ]);
+  void _loadMessages() {
+    _firestoreService.getMessages(widget.conversationId).listen(
+      (messagesData) {
+        if (!mounted) return;
+
+        final appState = context.read<AppStateProvider>();
+        final currentUserId = appState.userId ?? '';
+
+        final loadedMessages = messagesData.map((data) {
+          final senderId = data['senderId'] as String? ?? '';
+          final timestamp = data['timestamp'] as firestore.Timestamp?;
+          return Message(
+            id: data['id'] as String,
+            text: data['text'] as String? ?? '',
+            timestamp: timestamp?.toDate() ?? DateTime.now(),
+            isSent: senderId == currentUserId,
+          );
+        }).toList();
+
+        // Reverse to show oldest first (messages come sorted newest first)
+        final reversedMessages = loadedMessages.reversed.toList();
+
+        setState(() {
+          _messages = reversedMessages;
+          _isLoading = false;
+        });
+
+        // Scroll to bottom
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) {
+            _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+          }
+        });
+      },
+      onError: (error) {
+        debugPrint('Error loading messages: $error');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      },
+    );
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-    final msg = Message(id: DateTime.now().millisecondsSinceEpoch.toString(), text: text, timestamp: DateTime.now(), isSent: true);
-    setState(() {
-      _messages.add(msg);
-    });
-    _controller.clear();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent + 100,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
+    final appState = context.read<AppStateProvider>();
+    final currentUserId = appState.userId;
+    
+    if (currentUserId == null || widget.receiverId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot send message')),
+      );
+      return;
+    }
+
+    try {
+      await _firestoreService.sendMessage(
+        conversationId: widget.conversationId,
+        senderId: currentUserId,
+        receiverId: widget.receiverId!,
+        text: text,
+      );
+
+      _controller.clear();
+
+      // Scroll to bottom
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent + 100,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sending message: $e')),
         );
       }
-    });
+    }
   }
 
   @override
@@ -92,25 +161,12 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: widget.isOnline ? Colors.grey[700] : Colors.grey[400],
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        widget.isOnline ? 'Online now' : 'Offline',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
+                  Text(
+                    'Online',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
                   ),
                 ],
               ),
@@ -129,15 +185,49 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Column(
           children: [
             Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                itemCount: _messages.length,
-                itemBuilder: (context, index) {
-                  final m = _messages[index];
-                  return ChatBubble(text: m.text, timestamp: m.timestamp, isSent: m.isSent);
-                },
-              ),
+              child: _isLoading && _messages.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : _messages.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32.0),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.chat_bubble_outline,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No messages yet',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Start a conversation',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[500],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                          itemCount: _messages.length,
+                          itemBuilder: (context, index) {
+                            final m = _messages[index];
+                            return ChatBubble(text: m.text, timestamp: m.timestamp, isSent: m.isSent);
+                          },
+                        ),
             ),
             const Divider(height: 1),
             Padding(
@@ -173,7 +263,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     const SizedBox(width: 4),
                     IconButton(
                       onPressed: _sendMessage,
-                      icon: const Icon(Icons.mic, color: Colors.black),
+                      icon: const Icon(Icons.send, color: Colors.black),
                     ),
                   ],
                 ),

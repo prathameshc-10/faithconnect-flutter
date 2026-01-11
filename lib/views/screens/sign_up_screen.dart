@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/app_state_provider.dart';
 import '../../providers/user_role_provider.dart';
 import '../../constants/communities.dart';
-import '../widgets/main_navigation.dart';
+import '../widgets/worshiper_main_navigation.dart';
 import 'leader_profile_setup_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -50,32 +50,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     try {
       final appState = context.read<AppStateProvider>();
+
       await appState.signUp(
-        email: _emailController.text,
-        password: _passwordController.text,
-        name: _nameController.text,
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+        name: _nameController.text.trim(),
         role: _selectedRole,
         community: _selectedCommunity!,
       );
 
-      if (!mounted) return;
-
-      if (_selectedRole == UserRole.worshiper) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainNavigation()),
-          (_) => false,
-        );
-      } else {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LeaderProfileSetupScreen()),
-          (_) => false,
-        );
-      }
+      // ✅ No navigation - AuthGate handles it
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -197,14 +188,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     _InputLabel('COMMUNITY'),
                     DropdownButtonFormField<String>(
                       value: _selectedCommunity,
-                      items: Communities.all
-                          .map(
-                            (community) => DropdownMenuItem(
-                              value: community,
-                              child: Text(community),
-                            ),
-                          )
-                          .toList(),
+                      items:
+                          Communities.all
+                              .map(
+                                (community) => DropdownMenuItem(
+                                  value: community,
+                                  child: Text(community),
+                                ),
+                              )
+                              .toList(),
                       onChanged: (value) {
                         setState(() {
                           _selectedCommunity = value;
@@ -222,13 +214,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         hintText: 'Select your community',
                         filled: true,
                         fillColor:
-                            isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+                            isDark
+                                ? Colors.grey.shade900
+                                : Colors.grey.shade100,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
                           borderSide: BorderSide.none,
                         ),
                       ),
-                      dropdownColor: isDark ? Colors.grey.shade900 : Colors.white,
+                      dropdownColor:
+                          isDark ? Colors.grey.shade900 : Colors.white,
                     ),
 
                     const SizedBox(height: 20),
@@ -251,11 +246,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       },
                       suffix: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                         ),
                         onPressed:
-                            () =>
-                                setState(() => _obscurePassword = !_obscurePassword),
+                            () => setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            ),
                       ),
                     ),
                   ],
@@ -273,12 +271,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                      Icon(
+                        Icons.error_outline,
+                        color: Colors.red[700],
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: TextStyle(color: Colors.red[700], fontSize: 14),
+                          style: TextStyle(
+                            color: Colors.red[700],
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ],
@@ -313,19 +318,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  child:
+                      _isLoading
+                          ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                          : const Text(
+                            'Create Account',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        )
-                      : const Text(
-                          'Create Account',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
                 ),
               ),
 

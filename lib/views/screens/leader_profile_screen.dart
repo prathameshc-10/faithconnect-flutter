@@ -8,9 +8,13 @@ import '../../models/user_model.dart';
 import '../../models/post_model.dart';
 import '../../providers/posts_provider.dart';
 import '../../providers/app_state_provider.dart';
+import '../../providers/user_role_provider.dart';
 import '../../services/firestore_service.dart';
+import '../../services/storage_service.dart';
 import '../widgets/post_card.dart';
 import '../widgets/comments_bottom_sheet.dart';
+import 'chat_screen.dart';
+import 'sign_in_screen.dart';
 
 /// Leader Profile Screen
 /// Displays leader profile with Posts & Reels tabs
@@ -28,6 +32,7 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final FirestoreService _firestoreService = FirestoreService();
+  final StorageService _storageService = StorageService();
 
   /// IMAGE PICKER
   final ImagePicker _imagePicker = ImagePicker();
@@ -35,13 +40,144 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
 
   UserModel? _loadedLeader;
   bool _isLoading = true;
+  bool _isFollowing = false;
+  bool _isCheckingFollow = true;
+  bool _isOwnProfile = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _checkIfOwnProfile();
     _loadLeaderData();
     _loadPostsAndReels();
+    _checkFollowingStatus();
+  }
+
+  void _checkIfOwnProfile() {
+    final appState = context.read<AppStateProvider>();
+    _isOwnProfile = appState.userId == widget.leader.id;
+  }
+
+  Future<void> _checkFollowingStatus() async {
+    if (_isOwnProfile) {
+      setState(() {
+        _isCheckingFollow = false;
+      });
+      return;
+    }
+
+    final appState = context.read<AppStateProvider>();
+    if (appState.userId == null || appState.userRole != UserRole.worshiper) {
+      setState(() {
+        _isCheckingFollow = false;
+      });
+      return;
+    }
+
+    try {
+      final following = await _firestoreService.isFollowingLeader(
+        worshiperId: appState.userId!,
+        leaderId: widget.leader.id,
+      );
+      if (mounted) {
+        setState(() {
+          _isFollowing = following;
+          _isCheckingFollow = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isCheckingFollow = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleFollow() async {
+    final appState = context.read<AppStateProvider>();
+    if (appState.userId == null) return;
+
+    setState(() {
+      _isFollowing = true;
+    });
+
+    try {
+      await _firestoreService.followLeader(
+        worshiperId: appState.userId!,
+        leaderId: widget.leader.id,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Following ${_currentLeader.name}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isFollowing = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleUnfollow() async {
+    final appState = context.read<AppStateProvider>();
+    if (appState.userId == null) return;
+
+    setState(() {
+      _isFollowing = false;
+    });
+
+    try {
+      await _firestoreService.unfollowLeader(
+        worshiperId: appState.userId!,
+        leaderId: widget.leader.id,
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isFollowing = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleMessage() async {
+    final appState = context.read<AppStateProvider>();
+    if (appState.userId == null) return;
+
+    try {
+      final conversationId = await _firestoreService.getOrCreateConversation(
+        participant1Id: appState.userId!,
+        participant2Id: widget.leader.id,
+      );
+
+      if (!mounted) return;
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            conversationId: conversationId,
+            title: _currentLeader.name,
+            receiverId: widget.leader.id,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error starting conversation: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -98,31 +234,66 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
 
   UserModel get _currentLeader => _loadedLeader ?? widget.leader;
 
-  /// IMAGE PICK
+  /// IMAGE PICK (only for own profile)
   Future<void> _pickProfileImage() async {
+    if (!_isOwnProfile) return;
+
     final XFile? image = await _imagePicker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 80,
     );
 
-    if (image == null) return;
+    if (image == null || !mounted) return;
+
+    final appState = context.read<AppStateProvider>();
+    if (appState.userId == null) return;
 
     setState(() {
       _localProfileImage = File(image.path);
     });
 
-    // 🔥 NEXT STEP (optional)
-    // Upload to Firebase Storage
-    // Save download URL to Firestore
+    try {
+      // Upload to Firebase Storage
+      final imageUrl = await _storageService.uploadProfileImage(
+        userId: appState.userId!,
+        imageFile: _localProfileImage!,
+      );
+
+      // Save to Firestore
+      await _firestoreService.updateLeaderProfile(
+        uid: appState.userId!,
+        profileImageUrl: imageUrl,
+      );
+
+      if (mounted) {
+        setState(() {
+          _loadedLeader = _loadedLeader?.copyWith(profileImageUrl: imageUrl) ?? widget.leader;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile image updated')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _localProfileImage = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading image: $e')),
+        );
+      }
+    }
   }
 
   /// POSTS
   List<PostModel> _getLeaderPosts() {
+    if (!mounted) return [];
     return context.read<PostsProvider>().postsForLeader(_currentLeader.id);
   }
 
   /// REELS
   List<PostModel> _getLeaderReels() {
+    if (!mounted) return [];
     return context.read<PostsProvider>().reelsForLeader(_currentLeader.id);
   }
 
@@ -138,7 +309,7 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
         children: [
           /// PROFILE IMAGE
           GestureDetector(
-            onTap: _pickProfileImage,
+            onTap: _isOwnProfile ? _pickProfileImage : null,
             child: Stack(
               alignment: Alignment.bottomRight,
               children: [
@@ -170,21 +341,22 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
                         size: 18, color: Colors.white),
                   ),
 
-                /// CAMERA ICON
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+                /// CAMERA ICON (only for own profile)
+                if (_isOwnProfile)
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Icon(Icons.camera_alt,
+                          size: 16, color: Colors.white),
                     ),
-                    child: const Icon(Icons.camera_alt,
-                        size: 16, color: Colors.white),
                   ),
-                ),
               ],
             ),
           ),
@@ -235,23 +407,99 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
 
           const SizedBox(height: 20),
 
-          /// LOGOUT
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.logout),
-              label: const Text('Logout'),
-              onPressed: () async {
-                final appState = context.read<AppStateProvider>();
-                await appState.signOut();
-                if (!mounted) return;
+          /// ACTION BUTTONS (Follow/Message for worshipers viewing other leaders)
+          Consumer<AppStateProvider>(
+            builder: (context, appState, _) {
+              if (_isOwnProfile || appState.userRole != UserRole.worshiper) {
+                // Show logout only on own profile
+                if (_isOwnProfile) {
+                  return SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.logout),
+                      label: const Text('Logout'),
+                      onPressed: () async {
+                        await appState.signOut();
+                        if (!mounted) return;
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(builder: (_) => const SignInScreen()),
+                          (_) => false,
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.black,
+                        side: const BorderSide(color: Colors.black, width: 1.5),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              }
 
-                Navigator.of(context).pushNamedAndRemoveUntil(
-                  '/login',
-                  (_) => false,
-                );
-              },
-            ),
+              // Show Follow/Message buttons for worshipers
+              return Row(
+                children: [
+                  if (_isCheckingFollow)
+                    Expanded(
+                      child: const Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    )
+                  else ...[
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _isFollowing ? _handleUnfollow : _handleFollow,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.black,
+                          side: const BorderSide(color: Colors.black, width: 1.5),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          _isFollowing ? 'Unfollow' : 'Follow',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isFollowing ? _handleMessage : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          disabledBackgroundColor: Colors.grey[300],
+                        ),
+                        child: const Text(
+                          'Message',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -262,10 +510,30 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
   Widget _buildPostsTab() {
     final posts = _getLeaderPosts();
     if (posts.isEmpty) {
-      return const Center(child: Text('No posts yet'));
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.article_outlined, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                'No posts yet',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return ListView.builder(
+      padding: EdgeInsets.zero,
       itemCount: posts.length,
       itemBuilder: (_, i) => PostCard(
         post: posts[i],
@@ -284,10 +552,30 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
   Widget _buildReelsTab() {
     final reels = _getLeaderReels();
     if (reels.isEmpty) {
-      return const Center(child: Text('No reels yet'));
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.video_library_outlined, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                'No reels yet',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return ListView.builder(
+      padding: EdgeInsets.zero,
       itemCount: reels.length,
       itemBuilder: (_, i) => PostCard(
         post: reels[i],
@@ -304,29 +592,66 @@ class _LeaderProfileScreenState extends State<LeaderProfileScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          const SizedBox(height: 50),
-          _buildProfileHeader(),
-          Expanded(
-            child: TabBarView(
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          'Profile',
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: TabBar(
               controller: _tabController,
-              children: [
-                _buildPostsTab(),
-                _buildReelsTab(),
+              indicator: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.black,
+              tabs: const [
+                Tab(text: 'Posts'),
+                Tab(text: 'Reels'),
               ],
             ),
           ),
-        ],
+        ),
       ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildProfileHeader(),
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height - 200,
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildPostsTab(),
+                        _buildReelsTab(),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
     );
   }
 }

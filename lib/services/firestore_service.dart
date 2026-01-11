@@ -1,18 +1,19 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
 import '../constants/communities.dart';
 import '../providers/user_role_provider.dart';
 
 /// Service for Firestore database operations
 /// Handles user data, worshipers, and leaders collections
 class FirestoreService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final firestore.FirebaseFirestore _firestore = firestore.FirebaseFirestore.instance;
 
   // Collection references
-  CollectionReference get _usersCollection => _firestore.collection('users');
-  CollectionReference get _worshipersCollection => _firestore.collection('worshipers');
-  CollectionReference get _leadersCollection => _firestore.collection('leaders');
-  CollectionReference get _postsCollection => _firestore.collection('posts');
-  CollectionReference get _reelsCollection => _firestore.collection('reels');
+  firestore.CollectionReference get _usersCollection => _firestore.collection('users');
+  firestore.CollectionReference get _worshipersCollection => _firestore.collection('worshipers');
+  firestore.CollectionReference get _leadersCollection => _firestore.collection('leaders');
+  firestore.CollectionReference get _postsCollection => _firestore.collection('posts');
+  firestore.CollectionReference get _reelsCollection => _firestore.collection('reels');
+  firestore.CollectionReference get _conversationsCollection => _firestore.collection('conversations');
 
   /// Create user document in users collection
   Future<void> createUser({
@@ -32,7 +33,7 @@ class FirestoreService {
       'email': email,
       'role': role == UserRole.worshiper ? 'worshiper' : 'leader',
       'community': community,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': firestore.FieldValue.serverTimestamp(),
     });
   }
 
@@ -53,7 +54,7 @@ class FirestoreService {
       'email': email,
       'community': community,
       'connectedLeaders': <String>[],
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': firestore.FieldValue.serverTimestamp(),
     });
   }
 
@@ -77,7 +78,7 @@ class FirestoreService {
       'profileImageUrl': '',
       'isProfileComplete': false,
       'followers': <String>[],
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': firestore.FieldValue.serverTimestamp(),
     });
   }
 
@@ -106,6 +107,61 @@ class FirestoreService {
       return doc.data() as Map<String, dynamic>?;
     }
     return null;
+  }
+
+  /// Follow a leader (add to worshiper's connectedLeaders)
+  Future<void> followLeader({
+    required String worshiperId,
+    required String leaderId,
+  }) async {
+    final worshiperRef = _worshipersCollection.doc(worshiperId);
+    await worshiperRef.update({
+      'connectedLeaders': firestore.FieldValue.arrayUnion([leaderId]),
+    });
+
+    // Also add worshiper to leader's followers list
+    final leaderRef = _leadersCollection.doc(leaderId);
+    await leaderRef.update({
+      'followers': firestore.FieldValue.arrayUnion([worshiperId]),
+    });
+  }
+
+  /// Unfollow a leader
+  Future<void> unfollowLeader({
+    required String worshiperId,
+    required String leaderId,
+  }) async {
+    final worshiperRef = _worshipersCollection.doc(worshiperId);
+    await worshiperRef.update({
+      'connectedLeaders': firestore.FieldValue.arrayRemove([leaderId]),
+    });
+
+    // Remove worshiper from leader's followers list
+    final leaderRef = _leadersCollection.doc(leaderId);
+    await leaderRef.update({
+      'followers': firestore.FieldValue.arrayRemove([worshiperId]),
+    });
+  }
+
+  /// Check if worshiper is following a leader
+  Future<bool> isFollowingLeader({
+    required String worshiperId,
+    required String leaderId,
+  }) async {
+    final worshiperData = await getWorshiperData(worshiperId);
+    if (worshiperData == null) return false;
+    
+    final connectedLeaders = worshiperData['connectedLeaders'] as List<dynamic>? ?? [];
+    return connectedLeaders.contains(leaderId);
+  }
+
+  /// Get followed leaders for a worshiper
+  Future<List<String>> getFollowedLeaders(String worshiperId) async {
+    final worshiperData = await getWorshiperData(worshiperId);
+    if (worshiperData == null) return [];
+    
+    final connectedLeaders = worshiperData['connectedLeaders'] as List<dynamic>? ?? [];
+    return connectedLeaders.map((e) => e.toString()).toList();
   }
 
   /// Get leaders filtered by community
@@ -181,7 +237,7 @@ class FirestoreService {
       'comments': 0,
       'shares': 0,
       'views': 0,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': firestore.FieldValue.serverTimestamp(),
     });
     return docRef.id;
   }
@@ -204,12 +260,13 @@ class FirestoreService {
       'comments': 0,
       'shares': 0,
       'views': 0,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': firestore.FieldValue.serverTimestamp(),
     });
     return docRef.id;
   }
 
   /// Get posts filtered by community
+  /// Note: Sorting done in memory to avoid composite index requirement
   Stream<List<Map<String, dynamic>>> getPostsByCommunity(String community) {
     if (!Communities.isValid(community)) {
       return Stream.value([]);
@@ -217,18 +274,30 @@ class FirestoreService {
 
     return _postsCollection
         .where('community', isEqualTo: community)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) {
+      final posts = snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         data['id'] = doc.id;
         return data;
       }).toList();
+      
+      // Sort by createdAt in descending order (most recent first)
+      posts.sort((a, b) {
+        final aTime = a['createdAt'] as firestore.Timestamp?;
+        final bTime = b['createdAt'] as firestore.Timestamp?;
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+        return bTime.compareTo(aTime);
+      });
+      
+      return posts;
     });
   }
 
   /// Get reels filtered by community
+  /// Note: Sorting done in memory to avoid composite index requirement
   Stream<List<Map<String, dynamic>>> getReelsByCommunity(String community) {
     if (!Communities.isValid(community)) {
       return Stream.value([]);
@@ -236,14 +305,25 @@ class FirestoreService {
 
     return _reelsCollection
         .where('community', isEqualTo: community)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) {
+      final reels = snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         data['id'] = doc.id;
         return data;
       }).toList();
+      
+      // Sort by createdAt in descending order (most recent first)
+      reels.sort((a, b) {
+        final aTime = a['createdAt'] as firestore.Timestamp?;
+        final bTime = b['createdAt'] as firestore.Timestamp?;
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+        return bTime.compareTo(aTime);
+      });
+      
+      return reels;
     });
   }
 
@@ -251,14 +331,25 @@ class FirestoreService {
   Stream<List<Map<String, dynamic>>> getPostsByLeader(String leaderId) {
     return _postsCollection
         .where('authorId', isEqualTo: leaderId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) {
+      final posts = snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         data['id'] = doc.id;
         return data;
       }).toList();
+      
+      // Sort by createdAt in descending order
+      posts.sort((a, b) {
+        final aTime = a['createdAt'] as firestore.Timestamp?;
+        final bTime = b['createdAt'] as firestore.Timestamp?;
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+        return bTime.compareTo(aTime);
+      });
+      
+      return posts;
     });
   }
 
@@ -266,14 +357,158 @@ class FirestoreService {
   Stream<List<Map<String, dynamic>>> getReelsByLeader(String leaderId) {
     return _reelsCollection
         .where('authorId', isEqualTo: leaderId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) {
+      final reels = snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         data['id'] = doc.id;
         return data;
       }).toList();
+      
+      // Sort by createdAt in descending order
+      reels.sort((a, b) {
+        final aTime = a['createdAt'] as firestore.Timestamp?;
+        final bTime = b['createdAt'] as firestore.Timestamp?;
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+        return bTime.compareTo(aTime);
+      });
+      
+      return reels;
     });
+  }
+
+  /// Create or get conversation between two users
+  Future<String> getOrCreateConversation({
+    required String participant1Id,
+    required String participant2Id,
+  }) async {
+    // Try to find existing conversation
+    final existing1 = await _conversationsCollection
+        .where('participants', arrayContains: participant1Id)
+        .get();
+    
+    for (var doc in existing1.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final participants = data['participants'] as List<dynamic>? ?? [];
+      if (participants.contains(participant2Id)) {
+        return doc.id;
+      }
+    }
+
+    // Create new conversation
+    final docRef = _conversationsCollection.doc();
+    final sortedIds = [participant1Id, participant2Id]..sort();
+    await docRef.set({
+      'id': docRef.id,
+      'participants': sortedIds,
+      'lastMessage': '',
+      'lastMessageTime': firestore.FieldValue.serverTimestamp(),
+      'createdAt': firestore.FieldValue.serverTimestamp(),
+    });
+
+    return docRef.id;
+  }
+
+  /// Send a message
+  Future<void> sendMessage({
+    required String conversationId,
+    required String senderId,
+    required String receiverId,
+    required String text,
+  }) async {
+    // Add message to messages subcollection
+    await _conversationsCollection
+        .doc(conversationId)
+        .collection('messages')
+        .add({
+      'senderId': senderId,
+      'receiverId': receiverId,
+      'text': text,
+      'timestamp': firestore.FieldValue.serverTimestamp(),
+      'isRead': false,
+    });
+
+    // Update conversation with last message
+    await _conversationsCollection.doc(conversationId).update({
+      'lastMessage': text,
+      'lastMessageTime': firestore.FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Get messages for a conversation
+  /// Note: Sorting done in memory to avoid index requirement
+  Stream<List<Map<String, dynamic>>> getMessages(String conversationId) {
+    return _conversationsCollection
+        .doc(conversationId)
+        .collection('messages')
+        .snapshots()
+        .map((snapshot) {
+      final messages = snapshot.docs.map((doc) {
+        final data = doc.data();
+        final messageData = <String, dynamic>{'id': doc.id};
+        messageData.addAll(data);
+        return messageData;
+      }).toList();
+      
+      // Sort by timestamp in descending order (most recent first)
+      messages.sort((a, b) {
+        final aTime = a['timestamp'] as firestore.Timestamp?;
+        final bTime = b['timestamp'] as firestore.Timestamp?;
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+        return bTime.compareTo(aTime);
+      });
+      
+      return messages;
+    });
+  }
+
+  /// Get conversations for a user
+  /// Note: Sorting done in memory to avoid composite index requirement
+  Stream<List<Map<String, dynamic>>> getConversations(String userId) {
+    return _conversationsCollection
+        .where('participants', arrayContains: userId)
+        .snapshots()
+        .map((snapshot) {
+      final conversations = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+      
+      // Sort by lastMessageTime in descending order
+      conversations.sort((a, b) {
+        final aTime = a['lastMessageTime'] as firestore.Timestamp?;
+        final bTime = b['lastMessageTime'] as firestore.Timestamp?;
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+        return bTime.compareTo(aTime);
+      });
+      
+      return conversations;
+    });
+  }
+
+  /// Mark messages as read
+  Future<void> markMessagesAsRead({
+    required String conversationId,
+    required String userId,
+  }) async {
+    final messagesSnapshot = await _conversationsCollection
+        .doc(conversationId)
+        .collection('messages')
+        .where('receiverId', isEqualTo: userId)
+        .where('isRead', isEqualTo: false)
+        .get();
+
+    final batch = _firestore.batch();
+    for (var doc in messagesSnapshot.docs) {
+      batch.update(doc.reference, {'isRead': true});
+    }
+    await batch.commit();
   }
 }
